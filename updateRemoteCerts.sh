@@ -3,7 +3,7 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] user@hostName*"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] user@hostName.FQDN*"
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
 	echo "  -k: your Gandi LiveDNS key - defaults to the contents of ~/.ssh/gandiLiveDNS.key. Required if -1 specified"
@@ -71,6 +71,8 @@ fi
 
 for k in ${DEVICES}  #simplistic naming scheme to id devices:  ck* is a cloudkey, gw* is a udmp, pi* is a rPi
 do
+	echo "-------------- Processing "${k}
+
 	unset DEVICE_TYPE
 	if [[ "$k" =~ "pi" ]]; then
 		ACME_DIR=.acme.sh
@@ -83,7 +85,10 @@ do
 		DEVICE_TYPE="ck"
 	fi
 	
-	echo "-------------- Processing "${k}
+	if ! [[ "$k" =~ "@" ]]; then 
+		echo "** Missing user name in" ${k}
+		usage
+	fi	
 	
 	# Making sure the public key is correctly setuo - you might have to type your password the first time
 	${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
