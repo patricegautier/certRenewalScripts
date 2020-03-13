@@ -78,7 +78,6 @@ if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
 	unset BASE_FOUND
 
 
-
 	if [[ ${DEVICE_TYPE} == "udmp" ]] && ! [ -d ${UDMP_BASE} ]; then
 		echo "-t udmp specified, but "${UDMP_BASE}" does not exist"
 		exit 1;
@@ -88,10 +87,6 @@ if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
 		echo "-t ck specified, but "${UNIFI_BASE}" does not exist"
 		exit 1;
 	fi
-
-
-
-
 
 
 	if [ -d ${UDMP_BASE} ]; then
@@ -237,18 +232,21 @@ if [[ ${DEVICE_TYPE} == "pi" ]]; then
 	fi
 
 
-	# UNMS - installed on rPi with oznus image
+	# UNMS - installed on rPi with oznu's image
 	UNMS_BASE=/home/pi/unms/config/cert
 	if [ -d "$UNMS_BASE" ]; then
 		echo "Updating UNMS"
-		sudo cp /etc/ssl/private/cloudkey.key ${UNMS_BASE}/${DOMAIN}.key
-		sudo cp /etc/ssl/private/cloudkey.crt ${UNMS_BASE}/${DOMAIN}.crt
+		sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
+		sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
 		# is the UNMS user??
-		chown 1000:1000 ${UNMS_BASE}/${DOMAIN}.key ${UNMS_BASE}/${DOMAIN}.crt
+		chown pi:pi ${UNMS_BASE}/${DOMAIN}.key ${UNMS_BASE}/${DOMAIN}.crt
 		cd ${HOME}/unms && docker-compose down && docker-compose up -d
 	else
 		echo "Skipping UNMS"
 	fi
+ 
+    
+ 
 
 fi
 
