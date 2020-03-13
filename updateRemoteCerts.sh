@@ -41,10 +41,12 @@ DEVICES=$@
 
 if [ -z "$DEVICES" ]; then
 	HOSTS_PATH=${HOME}"/.ssh/remoteCertHosts.txt"
-	DEVICES=$(<${HOSTS_PATH})
+	if [ -f ${HOSTS_PATH} ]; then
+		DEVICES=$(<${HOSTS_PATH})
+	fi
 	if [ -z "$DEVICES" ]; then
-		echo "no host name specified and could not read "${HOSTS_PATH}
-		exit 1
+		echo "** No host name specified and could not read default devices list from "${HOSTS_PATH}
+		usage
 	fi
 	
 fi
@@ -58,7 +60,7 @@ if ! [ -z ${FIRST_RUN} ]; then
 		GANDI_KEY=$(<${KEY_PATH})
 		if [ -z "$GANDI_KEY" ]; then
 			echo "-1 specified without -k entry and could not read Gandi LiveDNS key from "${KEY_PATH}
-			exit 1
+			usage
 		fi
 	fi
 	FIRST_RUN="-1 ${GANDI_KEY}"
