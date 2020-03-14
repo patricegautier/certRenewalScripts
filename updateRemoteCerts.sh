@@ -26,10 +26,9 @@ unset GANDI_KEY
 while getopts '1fk:' o
 do
   case $o in
-    1) 
-    	FIRST_RUN="-1" ;;
+    1) FIRST_RUN="-1" ;;
     f) FORCE="-f" ;;
-    k) GANDI_KEY=${OPTARG}
+    k) GANDI_KEY=${OPTARG} ;;
   esac
 done
 
@@ -51,37 +50,39 @@ if [ -z "$DEVICES" ]; then
 fi
 
 
-if ! [ -z ${FIRST_RUN} ]; then
-
-	if [ -z ${GANDI_KEY} ]; then
-
-		KEY_PATH=${HOME}"/.ssh/gandiLiveDNS.key"
-		GANDI_KEY=$(<${KEY_PATH})
-		if [ -z "$GANDI_KEY" ]; then
-			echo "-1 specified without -k entry and could not read Gandi LiveDNS key from "${KEY_PATH}
-			usage
-		fi
-	fi
-	FIRST_RUN="-1 ${GANDI_KEY}"
-    	
+if [ -z ${GANDI_KEY} ] && ! [ -z ${FIRST_RUN} ]; then
+    KEY_PATH=${HOME}"/.ssh/gandiLiveDNS.key"
+    GANDI_KEY=$(<${KEY_PATH})
+    if [ -z "$GANDI_KEY" ] && ! [ -z ${FIRST_RUN} ]; then
+        echo "-1 specified without -k entry and could not read Gandi LiveDNS key from "${KEY_PATH}
+        usage
+    fi
 fi
 
+unset GANDI_KEY_OPTION
+if ! [ -z ${GANDI_KEY} ]; then
+    GANDI_KEY_OPTION="-k "${GANDI_KEY}
+fi
+
+REMOTE_SCRIPT_DIR=/tmp/
 
 
-for k in ${DEVICES}  #simplistic naming scheme to id devices:  ck* is a cloudkey, gw* is a udmp, pi* is a rPi
+for k in ${DEVICES}  #simplistic naming scheme to id devices:  ck* is a cloudkey, gw* is a udmp, pi* is a rPi, syn* is a synology box
 do
 	echo "-------------- Processing "${k}
 
 	unset DEVICE_TYPE
 	if [[ "$k" =~ "pi" ]]; then
-		ACME_DIR=.acme.sh
+		#REMOTE_SCRIPT_DIR=.acme.sh
 		DEVICE_TYPE="pi"
 	elif [[ "$k" =~ "gw" ]]; then
-		ACME_DIR=/mnt/data/unifi-os/
+		#REMOTE_SCRIPT_DIR=/mnt/data/unifi-os/
 		DEVICE_TYPE="udmp"
-	else 
-		ACME_DIR=/root/.acme.sh
+	elif [[ "$k" =~ "ck" ]]; then
+		#REMOTE_SCRIPT_DIR=/root/.acme.sh
 		DEVICE_TYPE="ck"
+    elif [[ "$k" =~ "syn" ]]; then
+        DEVICE_TYPE="syn"
 	fi
 	
 	if ! [[ "$k" =~ "@" ]]; then 
@@ -93,9 +94,9 @@ do
 	${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
 
 	# Making sure the acme directory exists
-	ssh ${k} mkdir -p ${ACME_DIR} || exit 1;
+	ssh ${k} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
 		
-	scp "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${ACME_DIR}/${REMOTE_SCRIPT_NAME} || exit 1;
+	scp "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
 	if [[ ${DEVICE_TYPE} == "udmp" ]]; then
 		echo "***** Need Manual Input"
 		echo
@@ -112,15 +113,8 @@ do
 		echo "  unifi-os restart"
 		echo
 	else
-		ssh ${k} ${ACME_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${k} || exit 1;
+		ssh ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${GANDI_KEY_OPTION} ${k} || exit 1;
 	fi
 done
 
 
-
-# Synology renewal
-# pi@pi499:~/synology $ ~/.acme.sh/acme.sh --issue --dns dns_gandi_livedns -d  syn99.gautiers.name
-# [Wed 25 Dec 15:23:53 PST 2019] Your cert is in  /home/pi/.acme.sh/syn99.gautiers.name/syn99.gautiers.name.cer 
-# [Wed 25 Dec 15:23:53 PST 2019] Your cert key is in  /home/pi/.acme.sh/syn99.gautiers.name/syn99.gautiers.name.key 
-# [Wed 25 Dec 15:23:53 PST 2019] The intermediate CA cert is in  /home/pi/.acme.sh/syn99.gautiers.name/ca.cer 
-# [Wed 25 Dec 15:23:53 PST 2019] And the full chain certs is there:  /home/pi/.acme.sh/syn99.gautiers.name/fullchain.cer 
