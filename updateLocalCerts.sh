@@ -3,10 +3,11 @@
 
 usage()
 {
-	echo "Usage "${0}" -t ck|udmp|pihole [-1 key] [-f] <fqdn>"
-	echo "	-t:	device type, cloud key, UDMP or pihole"
-	echo "  -1:  first run, will install acme.sh. Provide the Gandi Live DNS key"
+	echo "Usage "${0}" -t ck|udmp|pihole [-1] [-f] [-k key] <fqdn>"
+	echo "  -t:	device type, cloud key, UDMP or pihole"
+	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
+    echo "  -k: specify the Gandi Live DNS Key"
 	exit 2
 }
 
@@ -18,7 +19,7 @@ unset FORCE
 FIRST_RUN=false
 unset DEVICE_TYPE
 
-while getopts '1:ft:' o
+while getopts '1ft:k:' o
 do
   case $o in
     1) 
@@ -26,7 +27,8 @@ do
     	GANDI_LIVEDNS_KEY=${OPTARG}
     	;;
     f) FORCE="--force" ;;
-    t) DEVICE_TYPE=${OPTARG}
+    t) DEVICE_TYPE=${OPTARG} ;;
+    k) GANDI_LIVEDNS_KEY=${OPTARG} ;;
   esac
 done
 
@@ -53,17 +55,27 @@ BASE=${HOME}/.acme.sh
 
 if  ! [ -e  ${BASE}/acme.sh ]; then   # acme.sh is not installed
 	if ! ${FIRST_RUN}; then
-		echo "*** Please run updateRemoteCerts.sh with -1 to install and set up acme.sh"
+		echo "*** Please run updateRemoteCerts.sh with -1 -k <gandiKey> to install and set up acme.sh"
 		exit 1;
 	else
 		echo "Installing acme.sh"
+        if [ -z ${GANDI_LIVEDNS_KEY} ]; then
+            echo "*** First run and no Gandi Key specified"
+            exit 1;
+        fi
 		curl https://get.acme.sh | sh
-		#Key is in ~/.ssh/gandiLiveDNS.key on the remote machine
-		export GANDI_LIVEDNS_KEY
+        if ! [ -f ${BASE}/acme.sh ]; then
+            echo "** ACME Install Failed"
+            exit 1
+        fi
 	fi
 fi
 
+#Key is in ~/.ssh/gandiLiveDNS.key on the remote machine
+export GANDI_LIVEDNS_KEY
 
+
+${BASE}/acme.sh --upgrade > /dev/null
 ${BASE}/acme.sh --issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
 
 DT=`date +"%m-%d-%Y-%T"`
@@ -212,7 +224,6 @@ fi # end Unifi devices
 
 
 # for pi-holes
-
 if [[ ${DEVICE_TYPE} == "pi" ]]; then
 
 	PIHOLE=`which pihole`
@@ -236,29 +247,42 @@ if [[ ${DEVICE_TYPE} == "pi" ]]; then
 	UNMS_BASE=/home/pi/unms/config/cert
 	if [ -d "$UNMS_BASE" ]; then
 		echo "Updating UNMS"
-		sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
-		sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
-		# is the UNMS user??
-		chown pi:pi ${UNMS_BASE}/${DOMAIN}.key ${UNMS_BASE}/${DOMAIN}.crt
+		openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
+		openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
 		cd ${HOME}/unms && docker-compose down && docker-compose up -d
 	else
 		echo "Skipping UNMS"
 	fi
  
-    # Homebridge
+ fi
+ 
+ 
+ #HomeBridge
+ 
+ if [[ ${DEVICE_TYPE} == "pi" ]] || [[ ${DEVICE_TYPE} == "syn" ]] ; then
+
+    if [[ ${DEVICE_TYPE} == "pi" ]] ; then
+        HOMEBRIDGE_BASE=${HOME}/homebridge/config
+    elif [[ ${DEVICE_TYPE} == "syn" ]] ; then
+        HOMEBRIDGE_BASE=${HOME}//homebridge/
+    fi
+
     
-     HOMEBRIDGE_BASE=/home/pi/homebridge/config
      if [ -d "$HOMEBRIDGE_BASE" ]; then
          echo "Updating Homebridge"
-         sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
-         sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key
-         sudo rm -f ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-         sudo cat ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt > ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-         sudo rm ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
-         sudo chown pi:pi ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-        # RESTART
-        # sudo killall -15 homebridge; sleep 5.1; sudo killall -9 homebridge;
-        sudo kill -9 $(pidof homebridge-config-ui-x);
+         openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
+         openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key
+         rm -f ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+         cat ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt > ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+         rm ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
+         #chown pi:pi ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+                 
+         if [[ ${DEVICE_TYPE} == "pi" ]] ; then
+            sudo kill -9 $(pidof homebridge-config-ui-x);
+        else  #it's in a container on syn so can not kill it from this script
+            echo "** You need to restart the homebridge UI by hand"
+        fi
+        
      else
          echo "Skipping Homebridge"
      fi
