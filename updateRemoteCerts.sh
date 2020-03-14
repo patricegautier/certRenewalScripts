@@ -13,7 +13,6 @@ usage()
 }
 
 
-#SCRIPT_DIR="/Users/patrice/Library/Mobile Documents/com~apple~CloudDocs/House/Unifi"
 SCRIPT_DIR=$(dirname "$0")
 
 
