@@ -245,9 +245,24 @@ if [[ ${DEVICE_TYPE} == "pi" ]]; then
 		echo "Skipping UNMS"
 	fi
  
+    # Homebridge
     
- 
+     HOMEBRIDGE_BASE=/home/pi/homebridge/config
+     if [ -d "$HOMEBRIDGE_BASE" ]; then
+         echo "Updating Homebridge"
+         sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
+         sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key
+         sudo rm -f ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+         sudo cat ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt > ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+         sudo rm ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
+         sudo chown pi:pi ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
+        # RESTART
+        # sudo killall -15 homebridge; sleep 5.1; sudo killall -9 homebridge;
+        sudo kill -9 $(pidof homebridge-config-ui-x);
+     else
+         echo "Skipping Homebridge"
+     fi
+
 
 fi
-
 
