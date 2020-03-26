@@ -39,8 +39,17 @@ DOMAIN=$(echo ${USERATHOST} | cut -d"@" -f2)
 
 
 if [ -z "$DOMAIN" ]; then
+    echo "Missing Domain Name in "${USERATHOST}
 	usage;
 fi
+
+if ! [[ "$DOMAIN" =~ "." ]]; then
+    echo "Domain must be full qualified: "${DOMAIN}
+    usage;
+fi
+
+
+
 
 if [ -z ${DEVICE_TYPE} ]; then
 	usage;
@@ -287,6 +296,44 @@ if [[ ${DEVICE_TYPE} == "pi" ]]; then
          echo "Skipping Homebridge"
      fi
 
+fi
+
+
+
+# Synology certs
+# to enable password-less sudo, had to add to /etc/sudoers
+# patrice  ALL=(ALL) NOPASSWD: ALL
+
+
+if  [[ ${DEVICE_TYPE} == "syn" ]]; then
+
+    SYN_BASE=/usr/syno/etc/certificate
+    
+    FQDN_BASE=${SYN_BASE}/system/FQDN
+    DEFAULT_BASE=${SYN_BASE}/system/default
+    SMB_BASE=${SYN_BASE}/smbftpd/ftpd/
+    
+    echo "Installing Synology Certificates"
+    
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${FQDN_BASE}/cert.pem
+    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${FQDN_BASE}/privkey.pem
+    sudo cp ${FQDN_BASE}/cert.pem ${FQDN_BASE}/fullchain.pem
+        
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/cert.pem
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/privkey.pem
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/fullchain.pem
+    
+    sudo cp ${FQDN_BASE}/cert.pem ${DEFAULT_BASE}
+    sudo cp ${FQDN_BASE}/privkey.pem ${DEFAULT_BASE}
+    sudo cp ${FQDN_BASE}/fullchain.pem ${DEFAULT_BASE}
+
+    sudo cp ${FQDN_BASE}/cert.pem ${SMB_BASE}
+    sudo cp ${FQDN_BASE}/privkey.pem ${SMB_BASE}
+    sudo cp ${FQDN_BASE}/fullchain.pem ${SMB_BASE}
+
+    sudo nginx -s reload
 
 fi
+
+
 
