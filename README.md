@@ -37,9 +37,16 @@ Supported devices and services:
 	
 • UDMPs
 	- this one requires manual operator intervention given the script must run inside the container.  If anyone knows how to do this from SSH, please ping me
+
 • pihole
 	- pihole running lighthttpd
+
 • UNMS
 	- currently assumes it's installed on a raspberry pi at /home/pi/unms
+
 • Homebridge
-	- not implemented yet
+	- currently assumes it's installed at $HOME/homebridge
+
+• Synology
+	- updates the FQDN, default and SMB certs
+
