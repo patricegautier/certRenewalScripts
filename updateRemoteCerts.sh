@@ -88,7 +88,15 @@ do
 	if ! [[ "$k" =~ "@" ]]; then 
 		echo "** Missing user name in" ${k}
 		usage
-	fi	
+	fi
+ 
+    if ! [[ "$k" =~ "." ]]; then
+        echo "Domain must be full qualified: "${k}
+        usage;
+    fi
+
+
+ 
 	
 	# Making sure the public key is correctly setuo - you might have to type your password the first time
 	${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
