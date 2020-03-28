@@ -121,7 +121,7 @@ do
 		echo "  unifi-os restart"
 		echo
 	else
-		ssh ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${GANDI_KEY_OPTION} ${k} || exit 1;
+		ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${GANDI_KEY_OPTION} ${k} || exit 1;
 	fi
 done
 
