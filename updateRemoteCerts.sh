@@ -3,10 +3,11 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] user@hostName.FQDN*"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-c containerName] user@hostName.FQDN*"
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
 	echo "  -k: your Gandi LiveDNS key - defaults to the contents of ~/.ssh/gandiLiveDNS.key. Required if -1 specified"
+    ecgi "  -c: container name to install certs into. Assumes nginx install in that container in /etc/nginx"
 	echo "  user@hostname*: host names must be FQDNs. CK, UDMP or rPi are supported"
 	echo "		defaults to the contents of ~/.ssh/remoteCertHosts.txt"
 	exit 1
@@ -22,13 +23,15 @@ unset FORCE
 unset FIRST_RUN
 unset DEVICES
 unset GANDI_KEY
+unset CONTAINER_OPTION
 
-while getopts '1fk:' o
+while getopts '1fk:c:' o
 do
   case $o in
     1) FIRST_RUN="-1" ;;
     f) FORCE="-f" ;;
     k) GANDI_KEY=${OPTARG} ;;
+    c) CONTAINER_OPTION="-c "${OPTARG} ;;
   esac
 done
 
@@ -71,19 +74,19 @@ for k in ${DEVICES}  #simplistic naming scheme to id devices:  ck* is a cloudkey
 do
 	echo "-------------- Processing "${k}
 
-	unset DEVICE_TYPE
-	if [[ "$k" =~ "pi" ]]; then
-		#REMOTE_SCRIPT_DIR=.acme.sh
+	DEVICE_TYPE="generic"
+
+    if ! [ -z "${CONTAINER_OPTION}" ]; then
+        DEVICE_TYPE="container"
+    elif [[ "$k" =~ "pi" ]]; then
 		DEVICE_TYPE="pi"
 	elif [[ "$k" =~ "gw" ]]; then
-		#REMOTE_SCRIPT_DIR=/mnt/data/unifi-os/
 		DEVICE_TYPE="udmp"
 	elif [[ "$k" =~ "ck" ]]; then
-		#REMOTE_SCRIPT_DIR=/root/.acme.sh
 		DEVICE_TYPE="ck"
     elif [[ "$k" =~ "syn" ]]; then
         DEVICE_TYPE="syn"
-	fi
+    fi
 	
 	if ! [[ "$k" =~ "@" ]]; then 
 		echo "** Missing user name in" ${k}
@@ -121,7 +124,7 @@ do
 		echo "  unifi-os restart"
 		echo
 	else
-		ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${GANDI_KEY_OPTION} ${k} || exit 1;
+		ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${k} || exit 1;
 	fi
 done
 
