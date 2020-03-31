@@ -3,11 +3,12 @@
 
 usage()
 {
-	echo "Usage "${0}" -t ck|udmp|pihole [-1] [-f] [-k key] <fqdn>"
-	echo "  -t:	device type, cloud key, UDMP or pihole"
+	echo "Usage "${0}" -t ck|udmp|pihole [-1] [-f] [-k key] [-c name] <fqdn>"
+	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
     echo "  -k: specify the Gandi Live DNS Key"
+    echo "  -c: container name to install certs into"
 	exit 2
 }
 
@@ -19,7 +20,7 @@ unset FORCE
 FIRST_RUN=false
 unset DEVICE_TYPE
 
-while getopts '1ft:k:' o
+while getopts '1ft:k:c:' o
 do
   case $o in
     1) 
@@ -29,6 +30,7 @@ do
     f) FORCE="--force" ;;
     t) DEVICE_TYPE=${OPTARG} ;;
     k) GANDI_LIVEDNS_KEY=${OPTARG} ;;
+    c) CONTAINER_NAME=${OPTARG} ;;
   esac
 done
 
@@ -60,7 +62,7 @@ BASE=${HOME}/.acme.sh
 
 
 # First time installation
-# assumes acme.sh is in the default location ~/.acem.sh
+# assumes acme.sh is in the default location ~/.acme.sh
 
 if  ! [ -e  ${BASE}/acme.sh ]; then   # acme.sh is not installed
 	if ! ${FIRST_RUN}; then
@@ -335,5 +337,21 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
 
 fi
 
+if  [[ ${DEVICE_TYPE} == "container" ]]; then
+    
+    CERT_BASE=/etc/ssl/nginx/
+        
+    echo "Installing certs into container "${CONTAINER_NAME}
 
+    mkdir -p ${BASE}/${DOMAIN}/tmp
+
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.pem
+    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.pem ${CONTAINER_NAME}:/${CERT_BASE}/
+
+    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${BASE}/${DOMAIN}/tmp/ssl.key
+    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.key ${CONTAINER_NAME}:/${CERT_BASE}/
+    
+    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} "nginx -s reload"
+
+fi
 
