@@ -345,13 +345,19 @@ if  [[ ${DEVICE_TYPE} == "container" ]]; then
 
     mkdir -p ${BASE}/${DOMAIN}/tmp
 
-    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.pem
-    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.pem ${CONTAINER_NAME}:/${CERT_BASE}/
+#    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.pem
+#    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.pem ${CONTAINER_NAME}:/${CERT_BASE}/
+
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.crt
+    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.crt ${CONTAINER_NAME}:/${CERT_BASE}/
 
     sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${BASE}/${DOMAIN}/tmp/ssl.key
     sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.key ${CONTAINER_NAME}:/${CERT_BASE}/
-    
-    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} "nginx -s reload"
+
+#    sudo openssl dhparam -out ${BASE}/${DOMAIN}/dhparam.pem 1024
+#    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/dhparam.pem ${CONTAINER_NAME}:/${CERT_BASE}/
+
+    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} "/usr/sbin/nginx -s reload"
 
 fi
 
