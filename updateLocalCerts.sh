@@ -3,18 +3,22 @@
 
 usage()
 {
-	echo "Usage "${0}" -t ck|udmp|pihole [-1] [-f] [-k key] [-c name] <fqdn>"
+    echo "----------"
+    echo ${COMMAND} ${FULLCOMMAND}
+    echo "----------"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|unms [-1] [-f] [-k key] [-c name] [-d path] <fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
     echo "  -k: specify the Gandi Live DNS Key"
     echo "  -c: container name to install certs into"
+    
 	exit 2
 }
 
 
 COMMAND=$0
-
+FULLCOMMAND=$*
 
 unset FORCE
 FIRST_RUN=false
@@ -90,6 +94,15 @@ ${BASE}/acme.sh --upgrade > /dev/null
 ${BASE}/acme.sh --issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
 
 DT=`date +"%m-%d-%Y-%T"`
+
+
+# Let's create a bunch of variations in the ACME.sh directory
+# The idea is that the various services can point there instead of having to make a copy
+
+openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/${DOMAIN}.crt
+
+
+
 
 
 #unifi devices
@@ -234,6 +247,24 @@ if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
 fi # end Unifi devices
 
 
+if [[ ${DEVICE_TYPE} == "unms" ]]; then
+
+    
+    # UNMS - installed on rPi with nico640's image
+    #UNMS_BASE=/home/pi/unms/config/cert
+    #if [ -d "$UNMS_BASE" ]; then
+        #now expecting to link to those
+        #openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
+        #openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
+        #cd ${HOME}/unms && docker-compose down && docker-compose up -d
+    #fi
+
+    echo "Restarting UNMS"
+    cd ${HOME}/unms && docker-compose down && docker-compose up -d
+
+fi
+
+
 # for pi-holes
 if [[ ${DEVICE_TYPE} == "pi" ]]; then
 
@@ -253,17 +284,6 @@ if [[ ${DEVICE_TYPE} == "pi" ]]; then
 		echo "Skipping pi-hole"
 	fi
 
-
-	# UNMS - installed on rPi with oznu's image
-	UNMS_BASE=/home/pi/unms/config/cert
-	if [ -d "$UNMS_BASE" ]; then
-		echo "Updating UNMS"
-		openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
-		openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
-		cd ${HOME}/unms && docker-compose down && docker-compose up -d
-	else
-		echo "Skipping UNMS"
-	fi
  
  fi
  
@@ -341,12 +361,15 @@ if  [[ ${DEVICE_TYPE} == "container" ]]; then
     
     CERT_BASE=/etc/ssl/nginx/
         
+    
+    if [ -z "$CONTAINER_NAME" ]; then
+        echo "Missing Container Name"
+        usage;
+    fi
+
     echo "Installing certs into container "${CONTAINER_NAME}
 
     mkdir -p ${BASE}/${DOMAIN}/tmp
-
-#    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.pem
-#    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.pem ${CONTAINER_NAME}:/${CERT_BASE}/
 
     sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.crt
     sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.crt ${CONTAINER_NAME}:/${CERT_BASE}/
@@ -354,10 +377,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]; then
     sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${BASE}/${DOMAIN}/tmp/ssl.key
     sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.key ${CONTAINER_NAME}:/${CERT_BASE}/
 
-#    sudo openssl dhparam -out ${BASE}/${DOMAIN}/dhparam.pem 1024
-#    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/dhparam.pem ${CONTAINER_NAME}:/${CERT_BASE}/
-
-    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} "/usr/sbin/nginx -s reload"
+    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} /usr/sbin/nginx -s reload
 
 fi
 

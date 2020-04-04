@@ -3,12 +3,12 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-c containerName] user@hostName.FQDN*"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] user@hostName.FQDN*"
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
 	echo "  -k: your Gandi LiveDNS key - defaults to the contents of ~/.ssh/gandiLiveDNS.key. Required if -1 specified"
-    ecgi "  -c: container name to install certs into. Assumes nginx install in that container in /etc/nginx"
-	echo "  user@hostname*: host names must be FQDNs. CK, UDMP or rPi are supported"
+    echo "  -c: container name to install certs into. Assumes nginx install in that container in /etc/nginx"
+	echo "  type:user@hostname*: host names must be FQDNs. CK, UDMP or rPi are supported.  Only supported types right now are unms and container"
 	echo "		defaults to the contents of ~/.ssh/remoteCertHosts.txt"
 	exit 1
 }
@@ -25,13 +25,12 @@ unset DEVICES
 unset GANDI_KEY
 unset CONTAINER_OPTION
 
-while getopts '1fk:c:' o
+while getopts '1fk:' o
 do
   case $o in
     1) FIRST_RUN="-1" ;;
     f) FORCE="-f" ;;
     k) GANDI_KEY=${OPTARG} ;;
-    c) CONTAINER_OPTION="-c "${OPTARG} ;;
   esac
 done
 
@@ -67,7 +66,7 @@ if ! [ -z ${GANDI_KEY} ]; then
     GANDI_KEY_OPTION="-k "${GANDI_KEY}
 fi
 
-REMOTE_SCRIPT_DIR=/tmp/
+REMOTE_SCRIPT_DIR=/tmp
 
 
 for k in ${DEVICES}  #simplistic naming scheme to id devices:  ck* is a cloudkey, gw* is a udmp, pi* is a rPi, syn* is a synology box
@@ -75,9 +74,16 @@ do
 	echo "-------------- Processing "${k}
 
 	DEVICE_TYPE="generic"
-
-    if ! [ -z "${CONTAINER_OPTION}" ]; then
-        DEVICE_TYPE="container"
+    
+    if [[ "$k" =~ ":" ]]; then   # type was explicitly specified
+        DEVICE_TYPE=`echo "$k" | awk -F':' '{print $1}'`
+        if [[ ${DEVICE_TYPE} == "container" ]]; then
+            CONTAINER_NAME=`echo "$k" | awk -F':' '{print $2}'`
+            CONTAINER_OPTION="-c ${CONTAINER_NAME}"
+            k=`echo "$k" | awk -F':' '{print $3}'`
+        else
+            k=`echo "$k" | awk -F':' '{print $2}'`
+        fi
     elif [[ "$k" =~ "pi" ]]; then
 		DEVICE_TYPE="pi"
 	elif [[ "$k" =~ "gw" ]]; then
@@ -94,7 +100,7 @@ do
 	fi
  
     if ! [[ "$k" =~ "." ]]; then
-        echo "Domain must be full qualified: "${k}
+        echo "Domain must be fully qualified: "${k}
         usage;
     fi
 
