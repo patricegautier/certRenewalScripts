@@ -3,15 +3,18 @@
 
 usage()
 {
-    echo "----------"
+    echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|unms [-1] [-f] [-k key] [-c name] [-d path] <fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
     echo "  -k: specify the Gandi Live DNS Key"
-    echo "  -c: container name to install certs into"
+    echo "  -c: container name to install certs for and restart"
+    echo "  -d: the directory to install the container certs into, which must be in a docker volume"
+    echo "  -o: the directory which contains the docker-compose.yml for type compose"
+    echo "  -h: usage and list of default targets"
     
 	exit 2
 }
@@ -24,7 +27,7 @@ unset FORCE
 FIRST_RUN=false
 unset DEVICE_TYPE
 
-while getopts '1ft:k:c:' o
+while getopts '1ft:k:c:hd:o:' o
 do
   case $o in
     1) 
@@ -35,6 +38,9 @@ do
     t) DEVICE_TYPE=${OPTARG} ;;
     k) GANDI_LIVEDNS_KEY=${OPTARG} ;;
     c) CONTAINER_NAME=${OPTARG} ;;
+    d) CONTAINER_DIRECTORY=${OPTARG} ;;
+    o) COMPOSE_DIRECTORY=${OPTARG} ;;
+    h) usage ;;
   esac
 done
 
@@ -94,14 +100,6 @@ ${BASE}/acme.sh --upgrade > /dev/null
 ${BASE}/acme.sh --issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
 
 DT=`date +"%m-%d-%Y-%T"`
-
-
-# Let's create a bunch of variations in the ACME.sh directory
-# The idea is that the various services can point there instead of having to make a copy
-
-openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/${DOMAIN}.crt
-
-
 
 
 
@@ -357,27 +355,41 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
 
 fi
 
-if  [[ ${DEVICE_TYPE} == "container" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]]; then
     
-    CERT_BASE=/etc/ssl/nginx/
-        
-    
-    if [ -z "$CONTAINER_NAME" ]; then
-        echo "Missing Container Name"
+    CERT_BASE=${CONTAINER_DIRECTORY}
+
+    if [ -z "$CERT_BASE" ]; then
+        echo "Missing Target Directory"
         usage;
     fi
 
-    echo "Installing certs into container "${CONTAINER_NAME}
+    echo "Installing certs for "${CONTAINER_NAME}" into "${CERT_BASE}
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt
+    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key
+    sudo rm -f ${CERT_BASE}/${DOMAIN}.pem
+    sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt > ${CERT_BASE}/${DOMAIN}.pem
 
-    mkdir -p ${BASE}/${DOMAIN}/tmp
+    if  [[ ${DEVICE_TYPE} == "container" ]]; then
 
-    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/tmp/ssl.crt
-    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.crt ${CONTAINER_NAME}:/${CERT_BASE}/
-
-    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${BASE}/${DOMAIN}/tmp/ssl.key
-    sudo /usr/local/bin/docker cp ${BASE}/${DOMAIN}/tmp/ssl.key ${CONTAINER_NAME}:/${CERT_BASE}/
-
-    sudo /usr/local/bin/docker exec ${CONTAINER_NAME} /usr/sbin/nginx -s reload
+        if [ -z "$CONTAINER_NAME" ]; then
+            echo "Missing Container Name"
+            usage;
+        fi
+        echo "Restarting container "${CONTAINER_NAME}
+        sudo /usr/local/bin/docker restart ${CONTAINER_NAME}
+        
+    elif [[ ${DEVICE_TYPE} == "compose" ]]; then
+    
+        if [ -z "$COMPOSE_DIRECTORY" ]; then
+            echo "Missing docker compose directory"
+            usage;
+        fi
+        
+        echo "Restarting composed container from "${COMPOSE_DIRECTORY}
+        cd ${COMPOSE_DIRECTORY} && docker-compose down && docker-compose up -d
+        
+    fi
 
 fi
 
