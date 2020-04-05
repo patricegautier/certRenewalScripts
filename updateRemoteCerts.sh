@@ -15,6 +15,7 @@ usage()
     echo "    Possible formats are:"
     echo "       <username@FQDN>"
     echo "       unms:<username@FQDN>"
+    echo "       pihole:<username@FQDN>"
     echo "       container:<containName>:<targetDirectory>:<username@FQDN>"
     echo "          The target dir must be in a docker volume"
     echo ""
@@ -116,7 +117,7 @@ do
                 TARGET_DIR=`echo "$k" | awk -F':' '{print $3}'`
                 COMPOSE_OPTION="-o "${COMPOSE_DIR}" -d "${TARGET_DIR}
                 k=`echo "$k" | awk -F':' '{print $4}'`
-            else # unms only right now
+            else # unms and pihole only right now
                 k=`echo "$k" | awk -F':' '{print $2}'`
             fi
 
@@ -150,13 +151,14 @@ do
         ssh ${k} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
             
         scp "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
+
         if [[ ${DEVICE_TYPE} == "udmp" ]]; then
             echo "***** Need Manual Input"
             echo
             echo "1/ ssh into the UDMP with"
             echo "  ssh "${k}
             echo
-            echo "2/ start the unifi container with"
+            echo "2/ get into the unifi container with"
             echo "  unifi-os shell"
             echo
             echo "3/ and then in the container's shell run:"

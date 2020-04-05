@@ -6,7 +6,7 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
@@ -245,81 +245,6 @@ if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
 fi # end Unifi devices
 
 
-if [[ ${DEVICE_TYPE} == "unms" ]]; then
-
-    
-    # UNMS - installed on rPi with nico640's image
-    #UNMS_BASE=/home/pi/unms/config/cert
-    #if [ -d "$UNMS_BASE" ]; then
-        #now expecting to link to those
-        #openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${UNMS_BASE}/${DOMAIN}.crt
-        #openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${UNMS_BASE}/${DOMAIN}.key
-        #cd ${HOME}/unms && docker-compose down && docker-compose up -d
-    #fi
-
-    echo "Restarting UNMS"
-    cd ${HOME}/unms && docker-compose down && docker-compose up -d
-
-fi
-
-
-# for pi-holes
-if [[ ${DEVICE_TYPE} == "pi" ]]; then
-
-	PIHOLE=`which pihole`
-	if [ ! -z ${PIHOLE} ]; then
-		PIHOLE_STATUS=`pihole status | grep -o running`
-		if  [ "$PIHOLE_STATUS" = "running" ]; then
-			echo "Update pi-hole"
-			sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/pihole.crt
-			sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${BASE}/${DOMAIN}/pihole.key
-			sudo rm -f ${BASE}/${DOMAIN}/pihole.pem
-			sudo cat ${BASE}/${DOMAIN}/pihole.key ${BASE}/${DOMAIN}/pihole.crt > ${BASE}/${DOMAIN}/pihole.pem
-			sudo chown www-data ${BASE}/${DOMAIN}/pihole.pem
-			sudo service lighttpd restart 	
-		fi
-	else
-		echo "Skipping pi-hole"
-	fi
-
- 
- fi
- 
- 
- #HomeBridge
- 
- if [[ ${DEVICE_TYPE} == "pi" ]] || [[ ${DEVICE_TYPE} == "syn" ]] ; then
-
-    if [[ ${DEVICE_TYPE} == "pi" ]] ; then
-        HOMEBRIDGE_BASE=${HOME}/homebridge/config
-    elif [[ ${DEVICE_TYPE} == "syn" ]] ; then
-        HOMEBRIDGE_BASE=${HOME}//homebridge/
-    fi
-
-    
-     if [ -d "$HOMEBRIDGE_BASE" ]; then
-         echo "Updating Homebridge"
-         openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
-         openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key
-         rm -f ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-         cat ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt > ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-         rm ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.key ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.crt
-         #chown pi:pi ${HOMEBRIDGE_BASE}/cert/${DOMAIN}.pem
-                 
-         if [[ ${DEVICE_TYPE} == "pi" ]] ; then
-            sudo kill -9 $(pidof homebridge-config-ui-x);
-        else  #it's in a container on syn so can not kill it from this script
-            echo "** You need to restart the homebridge UI by hand"
-        fi
-        
-     else
-         echo "Skipping Homebridge"
-     fi
-
-fi
-
-
-
 # Synology certs
 # to enable password-less sudo, had to add to /etc/sudoers
 # patrice  ALL=(ALL) NOPASSWD: ALL
@@ -355,21 +280,30 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
 
 fi
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]]; then
-    
-    CERT_BASE=${CONTAINER_DIRECTORY}
 
+
+
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]]; then
+    
+    if [[ ${DEVICE_TYPE} == "pihole" ]]; then   # piholes refer directly to the .acme.sh directory
+        CERT_BASE=${BASE}/${DOMAIN}
+    else
+        CERT_BASE=${CONTAINER_DIRECTORY}
+    fi
+        
     if [ -z "$CERT_BASE" ]; then
         echo "Missing Target Directory"
         usage;
     fi
 
-    echo "Installing certs for "${CONTAINER_NAME}" into "${CERT_BASE}
-    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt
+
     sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt
     sudo rm -f ${CERT_BASE}/${DOMAIN}.pem
     sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt > ${CERT_BASE}/${DOMAIN}.pem
 
+
+    # Restart
     if  [[ ${DEVICE_TYPE} == "container" ]]; then
 
         if [ -z "$CONTAINER_NAME" ]; then
@@ -389,6 +323,10 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]]; t
         echo "Restarting composed container from "${COMPOSE_DIRECTORY}
         cd ${COMPOSE_DIRECTORY} && docker-compose down && docker-compose up -d
         
+    elif [[ ${DEVICE_TYPE} == "pihole" ]]; then
+    
+        sudo service lighttpd restart
+
     fi
 
 fi
