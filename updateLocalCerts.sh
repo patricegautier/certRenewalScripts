@@ -124,26 +124,12 @@ if [[ ${DEVICE_TYPE} == "ck" ]]; then
 	unset BASE_FOUND
 
 
-	if [[ ${DEVICE_TYPE} == "udmp" ]] && ! [ -d ${UDMP_BASE} ]; then
-		echo "-t udmp specified, but "${UDMP_BASE}" does not exist"
-		exit 1;
-	fi
-
 	if [[ ${DEVICE_TYPE} == "ck" ]] && ! [ -d ${UNIFI_BASE} ]; then
 		echo "-t ck specified, but "${UNIFI_BASE}" does not exist"
 		exit 1;
 	fi
 
-
-	if [ -d ${UDMP_BASE} ]; then
-	
-		CERT_BASE=${UDMP_BASE}
-		KEY_TYPE="UDMP keys"
-		CRT_FILE="unifi-core.crt"
-		KEY_FILE="unifi-core.key"
-		BASE_FOUND=true;
-
-	elif [ -d ${UNIFI_BASE} ]; then
+    if [ -d ${UNIFI_BASE} ]; then
 
 		CERT_BASE=${UNIFI_BASE}
 		KEY_TYPE="CloudKey keys"

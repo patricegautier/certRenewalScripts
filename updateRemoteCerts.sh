@@ -99,7 +99,6 @@ if ! [ -z ${GANDI_KEY} ]; then
     GANDI_KEY_OPTION="-k "${GANDI_KEY}
 fi
 
-REMOTE_SCRIPT_DIR=/tmp
 
 
 for k in ${DEVICES}
@@ -110,6 +109,7 @@ do
     unset TARGET_DIR
     unset CONTAINER_OPTION
     unset COMPOSE_OPTION
+    REMOTE_SCRIPT_DIR=/tmp
 
 	DEVICE_TYPE="generic"
     
@@ -214,7 +214,7 @@ do
             
             SUCCESS=$?
                 
-            if [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+            if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
                 exit 1
             fi
 
