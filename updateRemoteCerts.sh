@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -x
+#set -x
 
 usage()
 {
@@ -12,14 +12,16 @@ usage()
     echo "  -h: usage and lists the default targets"
     echo "  -v: verbose output"
     echo "  -s: using let's encrypt staging to avoid running into quotas"
+    echo "  -n: update the device <name> from the default list of targets"
+    echo "  -l: list the available device names from the list of targets"
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
     echo "    Possible formats are:"
-    echo "       unms:<username@FQDN>: UNMS container install"
-    echo "       pihole:<username@FQDN> for pihole on rasperry pi"
-    echo "       ck:<username@FQDN> for Cloud Keys"
-    echo "       syn:<username@FQDN> for Synology boxes"
-    echo "       container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
+    echo "       <name>:unms:<username@FQDN>: UNMS container install"
+    echo "       <name>:pihole:<username@FQDN> for pihole on rasperry pi"
+    echo "       <name>:ck:<username@FQDN> for Cloud Keys"
+    echo "       <name>:syn:<username@FQDN> for Synology boxes"
+    echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
     echo "          The target dir must be in a docker volume"
     echo ""
 	exit 1
@@ -39,16 +41,20 @@ unset CONTAINER_OPTION
 unset HELP
 unset VERBOSE
 unset STAGING_OPTION
+unset TARGET_DEVICE_NAME
+unset LIST_MODE
 
-while getopts '1fk:hvs' o
+while getopts '1fk:hvsn:l' OPT
 do
-  case $o in
+  case $OPT in
     1) FIRST_RUN="-1" ;;
     f) FORCE="-f" ;;
     k) GANDI_KEY=${OPTARG} ;;
     h) HELP="t" ;;
     v) VERBOSE="-v" ;;
     s) STAGING_OPTION="-s" ;;
+    n) TARGET_DEVICE_NAME=${OPTARG} ;;
+    l) LIST_MODE="t" ;;
   esac
 done
 
@@ -110,119 +116,131 @@ do
     unset CONTAINER_OPTION
     unset COMPOSE_OPTION
     REMOTE_SCRIPT_DIR=/tmp
+    unset DEVICE_TYPE
+    unset DEVICE_NAME
 
-	DEVICE_TYPE="generic"
-    
     if ! [[ -z "$k" ]] && ! [[ "$k" =~ ^\#.* ]]; then   # not a blank line and not a comment
 
-        echo "-------------- Processing "${k}
-
-        if [[ "$k" =~ ":" ]]; then   # type was explicitly specified
-            DEVICE_TYPE=`echo "$k" | awk -F':' '{print $1}'`
-
-            if [[ ${DEVICE_TYPE} == "container" ]]; then
-
-                CONTAINER_NAME=`echo "$k" | awk -F':' '{print $2}'`
-                TARGET_DIR=`echo "$k" | awk -F':' '{print $3}'`
-                CONTAINER_OPTION="-c "${CONTAINER_NAME}" -d "${TARGET_DIR}
-                k=`echo "$k" | awk -F':' '{print $4}'`
-                if ! [[ -z ${VERBOSE} ]]; then
-                    echo "Container name: "${CONTAINER_NAME}
-                    echo "Target directory: "${TARGET_DIR}
-                fi
-
-            elif [[ ${DEVICE_TYPE} == "compose" ]]; then
-
-                COMPOSE_DIR=`echo "$k" | awk -F':' '{print $2}'`
-                TARGET_DIR=`echo "$k" | awk -F':' '{print $3}'`
-                COMPOSE_OPTION="-o "${COMPOSE_DIR}" -d "${TARGET_DIR}
-                k=`echo "$k" | awk -F':' '{print $4}'`
-                if ! [[ -z ${VERBOSE} ]]; then
-                    echo "Container name: "${CONTAINER_NAME}
-                    echo "Target directory: "${TARGET_DIR}
-                fi
-                
-            else # unms, udmp and pihole
-                k=`echo "$k" | awk -F':' '{print $2}'`
-                if [[ ${DEVICE_TYPE} == "udmp" ]]; then
-                    #Those directories are hardcoded on a UDMP
-                    REMOTE_SCRIPT_DIR="/mnt/data/unifi-os"
-                    CONTAINER_OPTION="-c unifi-os -d data/unifi-core/config"
-                fi
-            fi
-        else
-            echo "Missing type in "$k
+        if ! [[ "$k" =~ ":" ]]; then   # Missing name
+            echo "Missing name in "$k
             usage
-        fi
-
-
-        if ! [[ "$k" =~ "@" ]]; then
-            echo "** Missing user name in" ${k}
-            usage
-        fi
-     
-        if ! [[ "$k" =~ "." ]]; then
-            echo "Domain must be fully qualified: "${k}
-            usage;
-        fi
-
-        if ! [[ -z ${VERBOSE} ]]; then
-            echo "Device type: "${DEVICE_TYPE}
-        fi
-
-        if ! [[ -z ${VERBOSE} ]]; then
-            echo "user@domain: "$k
-        fi
-
-
-     
-        
-        # Making sure the public key is correctly setuo - you might have to type your password the first time
-        ${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
-
-        # Making sure the acme directory exists
-        ssh -o LogLevel=Error  ${k} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
-            
-        if ! [[ -z ${VERBOSE} ]]; then
-            echo         scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
-        fi
-        scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
-
-        if [[ ${DEVICE_TYPE} == "udmp" ]]; then   #the UDMP is special because you have to run acme.sh inside the container
-
-            if ! [[ -z ${VERBOSE} ]]; then
-                echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
-            fi
-
-            ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2>/dev/null;
-            
-            SUCCESS=$?
-            
-            if [[ ${SUCCESS} -eq 0 ]]; then
-                ssh -o LogLevel=Error ${k} unifi-os restart
-            elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
-                exit 1
-            fi
- 
         else
-        
-            if ! [[ -z ${VERBOSE} ]]; then
-                echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} || exit 1;
-            fi
-        
-            ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
-            
-            SUCCESS=$?
-                
-            if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
-                exit 1
-            fi
-
-
+            DEVICE_NAME=`echo "$k" | awk -F':' '{print $1}'`
         fi
 
-    fi  # end not a comment
-    
+        if ! [[ -z ${LIST_MODE} ]]; then
+            echo ${DEVICE_NAME}
+        else
+            if [[ -z ${TARGET_DEVICE_NAME} ]] || [[ ${TARGET_DEVICE_NAME} = ${DEVICE_NAME} ]]; then
+
+                echo "-------------- Processing "${DEVICE_NAME}
+
+                if [[ "$k" =~ ":" ]]; then   # type was explicitly specified
+                    DEVICE_TYPE=`echo "$k" | awk -F':' '{print $2}'`
+
+                    if [[ ${DEVICE_TYPE} == "container" ]]; then
+
+                        CONTAINER_NAME=`echo "$k" | awk -F':' '{print $3}'`
+                        TARGET_DIR=`echo "$k" | awk -F':' '{print $4}'`
+                        CONTAINER_OPTION="-c "${CONTAINER_NAME}" -d "${TARGET_DIR}
+                        k=`echo "$k" | awk -F':' '{print $5}'`
+                        if ! [[ -z ${VERBOSE} ]]; then
+                            echo "Container name: "${CONTAINER_NAME}
+                            echo "Target directory: "${TARGET_DIR}
+                        fi
+
+                    elif [[ ${DEVICE_TYPE} == "compose" ]]; then
+
+                        COMPOSE_DIR=`echo "$k" | awk -F':' '{print $3}'`
+                        TARGET_DIR=`echo "$k" | awk -F':' '{print $4}'`
+                        COMPOSE_OPTION="-o "${COMPOSE_DIR}" -d "${TARGET_DIR}
+                        k=`echo "$k" | awk -F':' '{print $5}'`
+                        if ! [[ -z ${VERBOSE} ]]; then
+                            echo "Container name: "${CONTAINER_NAME}
+                            echo "Target directory: "${TARGET_DIR}
+                        fi
+                        
+                    else # unms, udmp and pihole
+                        k=`echo "$k" | awk -F':' '{print $3}'`
+                        if [[ ${DEVICE_TYPE} == "udmp" ]]; then
+                            #Those directories are hardcoded on a UDMP
+                            REMOTE_SCRIPT_DIR="/mnt/data/unifi-os"
+                            CONTAINER_OPTION="-c unifi-os -d data/unifi-core/config"
+                        fi
+                    fi
+                else
+                    echo "Missing type in "$k
+                    usage
+                fi
+
+
+                if ! [[ "$k" =~ "@" ]]; then
+                    echo "** Missing user name in" ${k}
+                    usage
+                fi
+             
+                if ! [[ "$k" =~ "." ]]; then
+                    echo "Domain must be fully qualified: "${k}
+                    usage;
+                fi
+
+                if ! [[ -z ${VERBOSE} ]]; then
+                    echo "Device type: "${DEVICE_TYPE}
+                fi
+
+                if ! [[ -z ${VERBOSE} ]]; then
+                    echo "user@domain: "$k
+                fi
+
+
+             
+                
+                # Making sure the public key is correctly setuo - you might have to type your password the first time
+                ${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
+
+                # Making sure the acme directory exists
+                ssh -o LogLevel=Error  ${k} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
+                    
+                if ! [[ -z ${VERBOSE} ]]; then
+                    echo         scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
+                fi
+                scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
+
+                if [[ ${DEVICE_TYPE} == "udmp" ]]; then   #the UDMP is special because you have to run acme.sh inside the container
+
+                    if ! [[ -z ${VERBOSE} ]]; then
+                        echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+                    fi
+
+                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2>/dev/null;
+                    
+                    SUCCESS=$?
+                    
+                    if [[ ${SUCCESS} -eq 0 ]]; then
+                        ssh -o LogLevel=Error ${k} unifi-os restart
+                    elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+                        exit 1
+                    fi
+         
+                else
+                
+                    if ! [[ -z ${VERBOSE} ]]; then
+                        echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} || exit 1;
+                    fi
+                
+                    ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+                    
+                    SUCCESS=$?
+                        
+                    if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
+                        exit 1
+                    fi
+
+
+                fi
+            fi
+        fi # end processing device
+    fi # end not a comment
 done
 
 
