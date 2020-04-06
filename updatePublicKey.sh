@@ -1,9 +1,10 @@
 #!/bin/bash
-#set -x
+# set -x
 
 usage()
 {
 	echo "Usage "${0}" user@targetMachine"
+    echo "  returns "
 	exit 2
 }
 
@@ -26,6 +27,5 @@ if [ ${PUBKEY_OK} != '0'  ]; then
    	ssh -q ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
 fi
 
-	
 
 

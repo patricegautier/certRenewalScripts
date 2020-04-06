@@ -15,8 +15,10 @@ usage()
     echo "  -d: the directory to install the container certs into, which must be in a docker volume"
     echo "  -o: the directory which contains the docker-compose.yml for type compose"
     echo "  -h: usage and list of default targets"
-    
-	exit 2
+    echo "  -s: use Let's encrypt's staging environment"
+    echo ""
+    echo "Return 0 if credentials were updated and the container restarted, 1 if failure, 2 if nothing was changed"
+	exit 1
 }
 
 
@@ -26,8 +28,10 @@ FULLCOMMAND=$*
 unset FORCE
 FIRST_RUN=false
 unset DEVICE_TYPE
+unset STAGING_OPTION
+unset VERBOSE
 
-while getopts '1ft:k:c:hd:o:' o
+while getopts 'v1ft:k:c:hd:o:s' o
 do
   case $o in
     1) 
@@ -41,6 +45,8 @@ do
     d) CONTAINER_DIRECTORY=${OPTARG} ;;
     o) COMPOSE_DIRECTORY=${OPTARG} ;;
     h) usage ;;
+    v) VERBOSE="t" ;;
+    s) STAGING_OPTION="--staging" ;;
   esac
 done
 
@@ -92,20 +98,26 @@ if  ! [ -e  ${BASE}/acme.sh ]; then   # acme.sh is not installed
 	fi
 fi
 
-#Key is in ~/.ssh/gandiLiveDNS.key on the remote machine
 export GANDI_LIVEDNS_KEY
 
 
+if ! [[ -z ${VERBOSE} ]]; then
+    echo ${BASE}/acme.sh --upgrade
+fi
 ${BASE}/acme.sh --upgrade > /dev/null
-${BASE}/acme.sh --issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
+
+
+if ! [[ -z ${VERBOSE} ]]; then
+    echo ${BASE}/acme.sh ${STAGING_OPTION}--issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
+fi
+${BASE}/acme.sh ${STAGING_OPTION} --issue --dns dns_gandi_livedns -d  ${DOMAIN} ${FORCE}
+
 
 DT=`date +"%m-%d-%Y-%T"`
 
-
-
 #unifi devices
 
-if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
+if [[ ${DEVICE_TYPE} == "ck" ]]; then
 
 	UDMP_BASE="/data/unifi-core/config"
 	UNIFI_BASE="/etc/ssl/private"
@@ -236,10 +248,6 @@ if [[ ${DEVICE_TYPE} == "ck" || ${DEVICE_TYPE} == "udmp" ]]; then
 	fi
 
 
-	if  [[ ${DEVICE_TYPE} == "udmp" ]]; then
-		echo "You need to restart unifi-os from outside the container"
-	fi
-
 
 	
 fi # end Unifi devices
@@ -260,30 +268,33 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
     
     echo "Installing Synology Certificates"
     
-    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${FQDN_BASE}/cert.pem
-    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${FQDN_BASE}/privkey.pem
-    sudo cp ${FQDN_BASE}/cert.pem ${FQDN_BASE}/fullchain.pem
+    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${FQDN_BASE}/cert.pem || exit 1
+    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${FQDN_BASE}/privkey.pem || exit 1
+    sudo cp ${FQDN_BASE}/cert.pem ${FQDN_BASE}/fullchain.pem || exit 1
         
-    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/cert.pem
-    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/privkey.pem
-    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/fullchain.pem
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/cert.pem || exit 1
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/privkey.pem || exit 1
+    sudo chmod  u=r,g=,o=   ${FQDN_BASE}/fullchain.pem || exit 1
     
-    sudo cp ${FQDN_BASE}/cert.pem ${DEFAULT_BASE}
-    sudo cp ${FQDN_BASE}/privkey.pem ${DEFAULT_BASE}
-    sudo cp ${FQDN_BASE}/fullchain.pem ${DEFAULT_BASE}
+    sudo cp ${FQDN_BASE}/cert.pem ${DEFAULT_BASE} || exit 1
+    sudo cp ${FQDN_BASE}/privkey.pem ${DEFAULT_BASE} || exit 1
+    sudo cp ${FQDN_BASE}/fullchain.pem ${DEFAULT_BASE} || exit 1
 
-    sudo cp ${FQDN_BASE}/cert.pem ${SMB_BASE}
-    sudo cp ${FQDN_BASE}/privkey.pem ${SMB_BASE}
-    sudo cp ${FQDN_BASE}/fullchain.pem ${SMB_BASE}
+    sudo cp ${FQDN_BASE}/cert.pem ${SMB_BASE} || exit 1
+    sudo cp ${FQDN_BASE}/privkey.pem ${SMB_BASE} || exit 1
+    sudo cp ${FQDN_BASE}/fullchain.pem ${SMB_BASE} || exit 1
 
-    sudo nginx -s reload
+    sudo nginx -s reload || exit 1
 
 fi
 
 
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]]; then
+    
+    unset DIFF
+    
     
     if [[ ${DEVICE_TYPE} == "pihole" ]]; then   # piholes refer directly to the .acme.sh directory
         CERT_BASE=${BASE}/${DOMAIN}
@@ -296,37 +307,65 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         usage;
     fi
 
-
-    sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key
-    sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt
-    sudo rm -f ${CERT_BASE}/${DOMAIN}.pem
-    sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt > ${CERT_BASE}/${DOMAIN}.pem
-
-
-    # Restart
-    if  [[ ${DEVICE_TYPE} == "container" ]]; then
-
-        if [ -z "$CONTAINER_NAME" ]; then
-            echo "Missing Container Name"
-            usage;
-        fi
-        echo "Restarting container "${CONTAINER_NAME}
-        sudo /usr/local/bin/docker restart ${CONTAINER_NAME}
-        
-    elif [[ ${DEVICE_TYPE} == "compose" ]]; then
+    if ! [[ -z ${VERBOSE} ]]; then
+        echo "Installing .key, .crt, .pem in "${CERT_BASE}
+    fi
     
-        if [ -z "$COMPOSE_DIRECTORY" ]; then
-            echo "Missing docker compose directory"
-            usage;
+    if ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [ `cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key` ]; then
+        sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key || exit 1
+        DIFF=1
+    elif ! [[ -z ${VERBOSE} ]]; then
+        echo ${CERT_BASE}/${DOMAIN}.key" unchanged"
+    fi
+
+    if ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [ `cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.crt ${CERT_BASE}/${DOMAIN}.crt` ]; then
+        sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.crt -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
+        DIFF=1
+    elif ! [[ -z ${VERBOSE} ]]; then
+        echo ${CERT_BASE}/${DOMAIN}.crt" unchanged"
+    fi
+
+    # Note can't use regular > or >> because those redirections will not inherit the sudo part
+    sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt | sudo tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
+    if ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [ `cmp -s ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem` ]; then
+        #sudo rm -f ${CERT_BASE}/${DOMAIN}.pem  || exit 1
+        sudo mv ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem || exit 1
+        DIFF=1
+    else
+        sudo rm -f ${CERT_BASE}/tmp.pem || exit 1
+    fi
+
+
+    if ! [[ -z "${DIFF}" ]]; then # Restart
+
+        if  [[ ${DEVICE_TYPE} == "container" ]]; then
+
+            if [ -z "$CONTAINER_NAME" ]; then
+                echo "Missing Container Name"
+                usage;
+            fi
+            echo "Restarting container "${CONTAINER_NAME}
+            sudo /usr/local/bin/docker restart ${CONTAINER_NAME} || exit 1
+            
+        elif [[ ${DEVICE_TYPE} == "compose" ]]; then
+        
+            if [ -z "$COMPOSE_DIRECTORY" ]; then
+                echo "Missing docker compose directory"
+                usage;
+            fi
+            
+            echo "Restarting composed container from "${COMPOSE_DIRECTORY}
+            cd ${COMPOSE_DIRECTORY} && docker-compose down && docker-compose up -d || exit 1
+            
+        elif [[ ${DEVICE_TYPE} == "pihole" ]]; then
+        
+            sudo service lighttpd restart || exit 1
+
         fi
         
-        echo "Restarting composed container from "${COMPOSE_DIRECTORY}
-        cd ${COMPOSE_DIRECTORY} && docker-compose down && docker-compose up -d
-        
-    elif [[ ${DEVICE_TYPE} == "pihole" ]]; then
-    
-        sudo service lighttpd restart
-
+    else
+        echo "No credential changed -- Skipping restart"
+        exit 2
     fi
 
 fi
