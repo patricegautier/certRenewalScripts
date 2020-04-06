@@ -194,10 +194,14 @@ do
                 echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
             fi
 
-            ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2>/dev/null || exit 1;
+            ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2>/dev/null;
             
-            if [[ $* -ne 2 ]]; then # don't restart if nothing was changed
+            SUCCESS=$?
+            
+            if [[ ${SUCCESS} -eq 0 ]]; then
                 ssh -o LogLevel=Error ${k} unifi-os restart
+            elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+                exit 1
             fi
  
         else
@@ -206,7 +210,14 @@ do
                 echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} || exit 1;
             fi
         
-            ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} || exit 1;
+            ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+            
+            SUCCESS=$?
+                
+            if [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+                exit 1
+            fi
+
 
         fi
 
