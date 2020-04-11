@@ -19,12 +19,13 @@ fi
 ssh -q -o "BatchMode yes" ${TARGET} true
 PUBKEY_OK=$?
 
+echo "st="${PUBKEY_OK}
 
 if [ ${PUBKEY_OK} != '0'  ]; then
 	echo "Need to update public key for " ${TARGET}
    	KEY_PATH=${HOME}"/.ssh/id_rsa.pub"
-   	PUBKEY=$(<${KEY_PATH})
-   	ssh -q ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
+   	PUBKEY=$(<${KEY_PATH}) || exit 1;
+   	ssh  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
 fi
 
 
