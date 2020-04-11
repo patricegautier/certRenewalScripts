@@ -277,12 +277,12 @@ fi
 
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]; then
     
     unset DIFF
     
     
-    if [[ ${DEVICE_TYPE} == "pihole" ]]; then   # piholes refer directly to the .acme.sh directory
+    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]; then   # piholes refer directly to the .acme.sh directory
         CERT_BASE=${BASE}/${DOMAIN}
     else
         CERT_BASE=${CONTAINER_DIRECTORY}

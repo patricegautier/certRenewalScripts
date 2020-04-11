@@ -19,8 +19,6 @@ fi
 ssh -q -o "BatchMode yes" ${TARGET} true
 PUBKEY_OK=$?
 
-echo "st="${PUBKEY_OK}
-
 if [ ${PUBKEY_OK} != '0'  ]; then
 	echo "Need to update public key for " ${TARGET}
    	KEY_PATH=${HOME}"/.ssh/id_rsa.pub"
