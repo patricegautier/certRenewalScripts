@@ -17,6 +17,7 @@ usage()
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
     echo "    Possible formats are:"
+    echo "       <name>:apache2:<username@FQDN> for apache setup"
     echo "       <name>:unms:<username@FQDN>: UNMS container install"
     echo "       <name>:pihole:<username@FQDN> for pihole on rasperry pi"
     echo "       <name>:ck:<username@FQDN> for Cloud Keys"
