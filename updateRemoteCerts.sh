@@ -3,7 +3,7 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] <target>*"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] [-n name] <target>*"
     echo ""
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
@@ -12,7 +12,7 @@ usage()
     echo "  -h: usage and lists the default targets"
     echo "  -v: verbose output"
     echo "  -s: using let's encrypt staging to avoid running into quotas"
-    echo "  -n: update the device <name> from the default list of targets"
+    echo "  -n: update the device named <name> from the default list of targets"
     echo "  -l: list the available device names from the list of targets"
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
