@@ -166,7 +166,7 @@ do
                         if [[ ${DEVICE_TYPE} == "udmp" ]]; then
                             #Those directories are hardcoded on a UDMP
                             REMOTE_SCRIPT_DIR="/mnt/data/unifi-os"
-                            CONTAINER_OPTION="-c unifi-os -d data/unifi-core/config"
+                            CONTAINER_OPTION="-c unifi-os -d /data/unifi-core/config"
                         fi
                     fi
                 else
