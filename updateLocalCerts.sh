@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -x
+#set -x
 
 usage()
 {
@@ -297,30 +297,35 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         echo "Installing .key, .crt, .pem in "${CERT_BASE}
     fi
     
-    if ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [ `cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key` ]; then
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [ $(cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key) ]; then
         sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key || exit 1
+        echo ${CERT_BASE}/${DOMAIN}.key" updated"
         DIFF=1
     elif ! [[ -z ${VERBOSE} ]]; then
         echo ${CERT_BASE}/${DOMAIN}.key" unchanged"
     fi
 
-    if ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [ `cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.crt ${CERT_BASE}/${DOMAIN}.crt` ]; then
-        sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.crt -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [ $(cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CERT_BASE}/${DOMAIN}.crt) ]; then
+        sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
+        echo ${CERT_BASE}/${DOMAIN}.crt" updated"
         DIFF=1
-    elif ! [[ -z ${VERBOSE} ]]; then
+    elif ! [ -z "$FORCE" ] || ! [[ -z ${VERBOSE} ]]; then
         echo ${CERT_BASE}/${DOMAIN}.crt" unchanged"
     fi
 
     # Note can't use regular > or >> because those redirections will not inherit the sudo part
     sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt | sudo tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
-    if ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [ `cmp -s ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem` ]; then
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [ $(cmp -s ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem) ]; then
         #sudo rm -f ${CERT_BASE}/${DOMAIN}.pem  || exit 1
         sudo mv ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem || exit 1
+        echo ${CERT_BASE}/${DOMAIN}.pem" updated"
         DIFF=1
     else
         sudo rm -f ${CERT_BASE}/tmp.pem || exit 1
+        echo ${CERT_BASE}/${DOMAIN}.pem" unchanged"
     fi
 
+    
 
     if ! [[ -z "${DIFF}" ]]; then # Restart
 
@@ -359,4 +364,6 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
     fi
 
 fi
+
+exit 0
 

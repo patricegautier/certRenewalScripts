@@ -3,7 +3,7 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] [-n name] <target>*"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] [ <target>* | <name>* ]"
     echo ""
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
@@ -12,7 +12,6 @@ usage()
     echo "  -h: usage and lists the default targets"
     echo "  -v: verbose output"
     echo "  -s: using let's encrypt staging to avoid running into quotas"
-    echo "  -n: update the device named <name> from the default list of targets"
     echo "  -l: list the available device names from the list of targets"
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
@@ -24,6 +23,7 @@ usage()
     echo "       <name>:syn:<username@FQDN> for Synology boxes"
     echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
     echo "          The target dir must be in a docker volume"
+    echo "  name: lookup devices definitions by name in ~/.ssh/remoteCertHosts.txt"
     echo ""
 	exit 1
 }
@@ -42,10 +42,10 @@ unset CONTAINER_OPTION
 unset HELP
 unset VERBOSE
 unset STAGING_OPTION
-unset TARGET_DEVICE_NAME
+unset TARGET_DEVICE_NAMES
 unset LIST_MODE
 
-while getopts '1fk:hvsn:l' OPT
+while getopts '1fk:hvsl' OPT
 do
   case $OPT in
     1) FIRST_RUN="-1" ;;
@@ -54,30 +54,38 @@ do
     h) HELP="t" ;;
     v) VERBOSE="-v" ;;
     s) STAGING_OPTION="-s" ;;
-    n) TARGET_DEVICE_NAME=${OPTARG} ;;
     l) LIST_MODE="t" ;;
   esac
 done
 
 shift $((OPTIND-1))
-DEVICES=$@
+DEVICES_FROM_CMDLINE=$@
 
 if ! [[ -z ${HELP} ]]; then
     usage
 fi
 
+# read config file
+HOSTS_PATH=${HOME}"/.ssh/remoteCertHosts.txt"
+if [ -f ${HOSTS_PATH} ]; then
+    DEVICES_FROM_FILE=`cat ${HOSTS_PATH} | grep ^[^#]`
+fi
 
-if [ -z "$DEVICES" ]; then
-	HOSTS_PATH=${HOME}"/.ssh/remoteCertHosts.txt"
-	if [ -f ${HOSTS_PATH} ]; then
-        DEVICES=`cat ${HOSTS_PATH} | grep ^[^#]`
-		#DEVICES=$(<${HOSTS_PATH})
-	fi
- fi
- 
+
+if [ -z "$DEVICES_FROM_CMDLINE" ]; then #nothing on the command line
+    DEVICES=${DEVICES_FROM_FILE}
+else
+    if  [[ "$DEVICES_FROM_CMDLINE" =~ ":" ]]; then  # it's a list of targets
+        DEVICES=${DEVICES_FROM_CMDLINE}
+    else #it's a list of names
+        DEVICES=${DEVICES_FROM_FILE}
+        TARGET_DEVICE_NAMES=${DEVICES_FROM_CMDLINE}
+    fi
+
+fi
     
 if [ -z "$DEVICES" ]; then
-    echo "** No host name specified and could not read default devices list from "${HOSTS_PATH}
+    echo "** No target or name specified and could not read default list from "${HOSTS_PATH}
     usage
 fi
 
@@ -132,7 +140,7 @@ do
         if ! [[ -z ${LIST_MODE} ]]; then
             echo ${DEVICE_NAME}
         else
-            if [[ -z ${TARGET_DEVICE_NAME} ]] || [[ ${TARGET_DEVICE_NAME} = ${DEVICE_NAME} ]]; then
+            if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} =~ ${DEVICE_NAME} ]]; then
 
                 echo "-------------- Processing "${DEVICE_NAME}
 
@@ -213,12 +221,15 @@ do
                         echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
                     fi
 
-                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2>/dev/null;
+                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 
                     
                     SUCCESS=$?
                     
                     if [[ ${SUCCESS} -eq 0 ]]; then
-                        ssh -o LogLevel=Error ${k} unifi-os restart
+                        if ! [[ -z ${VERBOSE} ]]; then
+                            echo "Restarting unifi-os on "${k}
+                        fi
+                        #ssh -o LogLevel=Error ${k} unifi-os restart
                     elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
                         exit 1
                     fi
@@ -226,7 +237,7 @@ do
                 else
                 
                     if ! [[ -z ${VERBOSE} ]]; then
-                        echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} || exit 1;
+                        echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
                     fi
                 
                     ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
