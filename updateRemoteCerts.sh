@@ -221,7 +221,7 @@ do
                         echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
                     fi
 
-                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 
+                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2> /tmp/updateLocalCerts.err
                     
                     SUCCESS=$?
                     
@@ -231,6 +231,7 @@ do
                         fi
                         #ssh -o LogLevel=Error ${k} unifi-os restart
                     elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+                        echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
                         exit 1
                     fi
          

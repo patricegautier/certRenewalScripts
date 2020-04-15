@@ -309,7 +309,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
         echo ${CERT_BASE}/${DOMAIN}.crt" updated"
         DIFF=1
-    elif ! [ -z "$FORCE" ] || ! [[ -z ${VERBOSE} ]]; then
+    elif ! [[ -z ${VERBOSE} ]]; then
         echo ${CERT_BASE}/${DOMAIN}.crt" unchanged"
     fi
 
@@ -321,8 +321,10 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         echo ${CERT_BASE}/${DOMAIN}.pem" updated"
         DIFF=1
     else
+        if ! [[ -z ${VERBOSE} ]]; then
+            echo ${CERT_BASE}/${DOMAIN}.pem" unchanged"
+        fi
         sudo rm -f ${CERT_BASE}/tmp.pem || exit 1
-        echo ${CERT_BASE}/${DOMAIN}.pem" unchanged"
     fi
 
     
