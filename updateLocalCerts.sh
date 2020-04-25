@@ -16,6 +16,7 @@ usage()
     echo "  -o: the directory which contains the docker-compose.yml for type compose"
     echo "  -h: usage and list of default targets"
     echo "  -s: use Let's encrypt's staging environment"
+    echo "  -b: specify the base directory for acme.sh - defaults to $HOME/.acme.sh"
     echo ""
     echo "Return 0 if credentials were updated and the container restarted, 1 if failure, 2 if nothing was changed"
 	exit 1
@@ -30,8 +31,9 @@ FIRST_RUN=false
 unset DEVICE_TYPE
 unset STAGING_OPTION
 unset VERBOSE
+unset BASE
 
-while getopts 'v1ft:k:c:hd:o:s' o
+while getopts 'v1ft:k:c:hd:o:sb:' o
 do
   case $o in
     1) 
@@ -47,6 +49,7 @@ do
     h) usage ;;
     v) VERBOSE="t" ;;
     s) STAGING_OPTION="--staging" ;;
+    b) BASE=${OPTARG} ;;
   esac
 done
 
@@ -73,8 +76,11 @@ if [ -z ${DEVICE_TYPE} ]; then
 	usage;
 fi
 
-
-BASE=${HOME}/.acme.sh
+if [ -z ${BASE} ]; then
+    BASE=${HOME}/.acme.sh
+elif ! [[ -z ${VERBOSE} ]]; then
+    echo "Custom base for acme.sh: "${BASE}
+fi
 
 
 # First time installation
