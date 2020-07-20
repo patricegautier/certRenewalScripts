@@ -287,6 +287,13 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
     else
         CERT_BASE=${CONTAINER_DIRECTORY}
     fi
+    
+    if  [[ ${DEVICE_TYPE} == "container" ]]; then
+        unset SUDODEF
+    else
+    	SUDODEF=sudo
+    fi
+    
         
     if [ -z "$CERT_BASE" ]; then
         echo "Missing Target Directory"
@@ -297,34 +304,34 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         echo "Installing .key, .crt, .pem in "${CERT_BASE}
     fi
     
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [ $(cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key) ]; then
-        sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key) ]]; then
+        ${SUDODEF} openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key || exit 1
         echo ${CERT_BASE}/${DOMAIN}.key" updated"
         DIFF=1
     elif ! [[ -z ${VERBOSE} ]]; then
-        echo ${CERT_BASE}/${DOMAIN}.key" unchanged"
+        echo ${CERT_BASE}/${DOMAIN}.key" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.key
     fi
 
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [ $(cmp -s ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CERT_BASE}/${DOMAIN}.crt) ]; then
-        sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CERT_BASE}/${DOMAIN}.crt) ]]; then
+        ${SUDODEF} openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
         echo ${CERT_BASE}/${DOMAIN}.crt" updated"
         DIFF=1
     elif ! [[ -z ${VERBOSE} ]]; then
-        echo ${CERT_BASE}/${DOMAIN}.crt" unchanged"
+        echo ${CERT_BASE}/${DOMAIN}.crt" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.cer
     fi
 
     # Note can't use regular > or >> because those redirections will not inherit the sudo part
-    sudo cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt | sudo tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [ $(cmp -s ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem) ]; then
+    ${SUDODEF} cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt | ${SUDODEF} tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [[ $(cmp  ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem) ]]; then
         #sudo rm -f ${CERT_BASE}/${DOMAIN}.pem  || exit 1
-        sudo mv ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem || exit 1
+        ${SUDODEF} mv ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem || exit 1
         echo ${CERT_BASE}/${DOMAIN}.pem" updated"
         DIFF=1
     else
         if ! [[ -z ${VERBOSE} ]]; then
-            echo ${CERT_BASE}/${DOMAIN}.pem" unchanged"
+            echo ${CERT_BASE}/${DOMAIN}.pem" unchanged, same as "${CERT_BASE}/tmp.pem
         fi
-        sudo rm -f ${CERT_BASE}/tmp.pem || exit 1
+        ${SUDODEF} rm -f ${CERT_BASE}/tmp.pem || exit 1
     fi
 
     
@@ -338,7 +345,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
                 usage;
             fi
             echo "Restarting container "${CONTAINER_NAME}
-            sudo /usr/local/bin/docker restart ${CONTAINER_NAME} || exit 1
+            /usr/local/bin/docker restart ${CONTAINER_NAME} || exit 1
             
         elif [[ ${DEVICE_TYPE} == "compose" ]]; then
         
