@@ -226,10 +226,10 @@ do
                     SUCCESS=$?
                     
                     if [[ ${SUCCESS} -eq 0 ]]; then
-                        if ! [[ -z ${VERBOSE} ]]; then
+                        #if ! [[ -z ${VERBOSE} ]]; then
                             echo "Restarting unifi-os on "${k}
-                        fi
-                        #ssh -o LogLevel=Error ${k} unifi-os restart
+                        #fi
+                        ssh -o LogLevel=Error ${k} unifi-os restart
                     elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
                         echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
                         exit 1
@@ -246,7 +246,8 @@ do
                     SUCCESS=$?
                         
                     if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
-                        exit 1
+                    	echo "********************************* "$k" failed"
+                        #exit 1 -- keep going
                     fi
 
 
