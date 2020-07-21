@@ -136,26 +136,34 @@ if [[ ${DEVICE_TYPE} == "ck" ]]; then
 		CRT_FILE="cloudkey.crt"
 		KEY_FILE="cloudkey.key"
 		BASE_FOUND=true;
+		SUDODEF=sudo
+		unset DIFF
 
 	fi
 
 	if [ ${BASE_FOUND} ]; then
 
+		# test for diffs
+
 		echo Installing ${KEY_TYPE}
 
 
-		if [ -f ${CERT_BASE}/${CRT_FILE} ]; then
-			sudo mv ${CERT_BASE}/${CRT_FILE} ${CERT_BASE}/${CRT_FILE}.${DT}
-		fi
+	    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${KEY_FILE} ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${KEY_FILE}) ]]; then
+	        ${SUDODEF} openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${KEY_FILE} || exit 1
+	        echo ${CERT_BASE}/${KEY_FILE}" updated"
+	        DIFF=1
+	    elif ! [[ -z ${VERBOSE} ]]; then
+	        echo ${CERT_BASE}/${KEY_FILE}" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.key
+	    fi
 
-		sudo openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${CRT_FILE}
-	
-	
-		if [ -f ${CERT_BASE}/${KEY_FILE} ]; then
-			sudo mv ${CERT_BASE}/${KEY_FILE} ${CERT_BASE}/${KEY_FILE}.${DT}
-		fi
+	    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${CRT_FILE} ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CERT_BASE}/${CRT_FILE}) ]]; then
+	        ${SUDODEF} openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${CRT_FILE} || exit 1
+	        echo ${CERT_BASE}/${CRT_FILE}" updated"
+	        DIFF=1
+	    elif ! [[ -z ${VERBOSE} ]]; then
+	        echo ${CERT_BASE}/${CRT_FILE}" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.cer
+	    fi
 
-		sudo openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${KEY_FILE}
 
 	else
 	
@@ -164,11 +172,8 @@ if [[ ${DEVICE_TYPE} == "ck" ]]; then
 		
 	fi
 
+    if ! [[ -z "${DIFF}" ]]; then # Restart
 
-
-	
-	if [[ ${DEVICE_TYPE} == "ck" ]]; then
-	
 		NGINX=`which nginx`
 
 		if [ ! -z ${NGINX} ]; then
@@ -218,22 +223,22 @@ if [[ ${DEVICE_TYPE} == "ck" ]]; then
 		## Protect - right now the cloud key needs to be restarted to take the new cert -- there has to be a better way
 		PROTECT_BASE=/srv/unifi-protect/
 		if [ -d "$PROTECT_BASE" ]; then
-			echo "You need to restart " $1 " to get Protect to use new Cert"
-			echo "Do you wish to reboot now?"
-			select yn in "Yes" "No"; do
-				case $yn in
-				  Yes ) sudo reboot; break;;
-				  No ) exit;;
-				esac
-			done	
+			#echo "You need to restart " $1 " to get Protect to use new Cert"
+			#echo "Do you wish to reboot now?"
+			#select yn in "Yes" "No"; do
+			#	case $yn in
+			#	  Yes ) sudo reboot; break;;
+			#	  No ) exit;;
+			#	esac
+			#done
+			sudo reboot #there is a diff we reboot
 		else
 			echo "Skipping Protect"
 		fi
 
 		
-	fi
 
-
+	fi # End restart logic
 
 	
 fi # end Unifi devices
