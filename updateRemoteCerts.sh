@@ -21,6 +21,7 @@ usage()
     echo "       <name>:pihole:<username@FQDN> for pihole on rasperry pi"
     echo "       <name>:ck:<username@FQDN> for Cloud Keys"
     echo "       <name>:syn:<username@FQDN> for Synology boxes"
+    echo "       <name>:nvr4:<username@FQDN> for Unifi NVR4 protect servers"
     echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
     echo "          The target dir must be in a docker volume"
     echo "  name: lookup devices definitions by name in ~/.ssh/remoteCertHosts.txt"

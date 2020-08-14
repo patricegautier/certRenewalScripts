@@ -6,7 +6,7 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2 [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4 [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
@@ -282,12 +282,12 @@ fi
 
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then
     
     unset DIFF
     
     
-    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]; then   # piholes refer directly to the .acme.sh directory
+    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]] ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then   # piholes refer directly to the .acme.sh directory
         CERT_BASE=${BASE}/${DOMAIN}
     else
         CERT_BASE=${CONTAINER_DIRECTORY}
@@ -370,7 +370,13 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         
             sudo service apache2 restart || exit 1
 
+        elif  [[ ${DEVICE_TYPE} == "nvr4" ]]; then
+        
+            sudo service unifi-core restart || exit 1 # not sure if that is enough
+
         fi
+        
+        
         
     else
         echo "No credential changed -- Skipping restart"
