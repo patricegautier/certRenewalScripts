@@ -6,13 +6,13 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4 [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|remote [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
     echo "  -k: specify the Gandi Live DNS Key"
     echo "  -c: container name to install certs for and restart"
-    echo "  -d: the directory to install the container certs into, which must be in a docker volume"
+    echo "  -d: the directory to install the container certs into, which must be in a docker volume, or as a remote path for remote type"
     echo "  -o: the directory which contains the docker-compose.yml for type compose"
     echo "  -h: usage and list of default targets"
     echo "  -s: use Let's encrypt's staging environment"
@@ -280,6 +280,22 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
 fi
 
 
+if  [[ ${DEVICE_TYPE} == "remote" ]]; then # we need to copy cert and key to remote host
+
+	# deal with restart needed - we force for now
+
+	openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${BASE}/${DOMAIN}/${DOMAIN}.crt
+	if ! [[ -z ${VERBOSE} ]]; then
+		echo "Copying cert and key to "${CONTAINER_DIRECTORY}
+	fi
+
+	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.key ${CONTAINER_DIRECTORY}
+	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CONTAINER_DIRECTORY}
+	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.crt ${CONTAINER_DIRECTORY}
+
+	echo ${k}" will need to be restarted by hand if necessary"
+
+fi
 
 
 if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then

@@ -117,7 +117,7 @@ fi
 
 
 
-for k in ${DEVICES}
+for DEVICE_DEFINITION in ${DEVICES}
 do
 
     unset DEVICE_TYPE
@@ -128,14 +128,15 @@ do
     REMOTE_SCRIPT_DIR=/tmp
     unset DEVICE_TYPE
     unset DEVICE_NAME
+    unset REMOTE_OPTION
 
-    if ! [[ -z "$k" ]] && ! [[ "$k" =~ ^\#.* ]]; then   # not a blank line and not a comment
+    if ! [[ -z "$DEVICE_DEFINITION" ]] && ! [[ "$DEVICE_DEFINITION" =~ ^\#.* ]]; then   # not a blank line and not a comment
 
-        if ! [[ "$k" =~ ":" ]]; then   # Missing name
-            echo "Missing name in "$k
+        if ! [[ "$DEVICE_DEFINITION" =~ ":" ]]; then   # Missing name
+            echo "Missing name in "$DEVICE_DEFINITION
             usage
         else
-            DEVICE_NAME=`echo "$k" | awk -F':' '{print $1}'`
+            DEVICE_NAME=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $1}'`
         fi
 
         if ! [[ -z ${LIST_MODE} ]]; then
@@ -145,15 +146,16 @@ do
 
                 echo "-------------- Processing "${DEVICE_NAME}
 
-                if [[ "$k" =~ ":" ]]; then   # type was explicitly specified
-                    DEVICE_TYPE=`echo "$k" | awk -F':' '{print $2}'`
+                if [[ "$DEVICE_DEFINITION" =~ ":" ]]; then   # type was  specified
+                    DEVICE_TYPE=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $2}'`
+                    k=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $3}'`
+
 
                     if [[ ${DEVICE_TYPE} == "container" ]]; then
 
-                        CONTAINER_NAME=`echo "$k" | awk -F':' '{print $3}'`
-                        TARGET_DIR=`echo "$k" | awk -F':' '{print $4}'`
+                        CONTAINER_NAME=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $4}'`
+                        TARGET_DIR=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $5}'`
                         CONTAINER_OPTION="-c "${CONTAINER_NAME}" -d "${TARGET_DIR}
-                        k=`echo "$k" | awk -F':' '{print $5}'`
                         if ! [[ -z ${VERBOSE} ]]; then
                             echo "Container name: "${CONTAINER_NAME}
                             echo "Target directory: "${TARGET_DIR}
@@ -161,17 +163,25 @@ do
 
                     elif [[ ${DEVICE_TYPE} == "compose" ]]; then
 
-                        COMPOSE_DIR=`echo "$k" | awk -F':' '{print $3}'`
-                        TARGET_DIR=`echo "$k" | awk -F':' '{print $4}'`
+                        COMPOSE_DIR=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $4}'`
+                        TARGET_DIR=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $5}'`
                         COMPOSE_OPTION="-o "${COMPOSE_DIR}" -d "${TARGET_DIR}
-                        k=`echo "$k" | awk -F':' '{print $5}'`
                         if ! [[ -z ${VERBOSE} ]]; then
                             echo "Container name: "${CONTAINER_NAME}
                             echo "Target directory: "${TARGET_DIR}
                         fi
+
+                    elif [[ ${DEVICE_TYPE} == "remote" ]]; then
+
+                        TARGET_DIR=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $4}'`
+                        REMOTE_OPTION="-d "${k}:${TARGET_DIR}
+                        if ! [[ -z ${VERBOSE} ]]; then
+                            echo "Remote Option: "${REMOTE_OPTION}
+                        fi
+
+
                         
-                    else # unms, udmp and pihole
-                        k=`echo "$k" | awk -F':' '{print $3}'`
+                    else # unms, udmp and pihole..
                         if [[ ${DEVICE_TYPE} == "udmp" ]]; then
                             #Those directories are hardcoded on a UDMP
                             REMOTE_SCRIPT_DIR="/mnt/data/unifi-os"
@@ -179,7 +189,7 @@ do
                         fi
                     fi
                 else
-                    echo "Missing type in "$k
+                    echo "Missing type in "$DEVICE_DEFINITION
                     usage
                 fi
 
@@ -203,26 +213,36 @@ do
                 fi
 
 
+				if [[ ${DEVICE_TYPE} == "remote" ]]; then # run on the local machine and just copy the certs!
+					unset SSH_DEF
+					SCP_DEF=cp
+					unset SCP_K_DEF
+				else
+					SSH_DEF="ssh -o LogLevel=Error "${k}
+					SCP_DEF="scp -o LogLevel=Error"
+					SCP_K_DEF=${k}:
+				fi
              
                 
                 # Making sure the public key is correctly setuo - you might have to type your password the first time
                 ${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
 
                 # Making sure the acme directory exists
-                ssh -o LogLevel=Error  ${k} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
+                
+                ${SSH_DEF} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
                     
                 if ! [[ -z ${VERBOSE} ]]; then
-                    echo         scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
+                    echo ${SCP_DEF}  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
                 fi
-                scp -o LogLevel=Error  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${k}:${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
+                ${SCP_DEF} "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
 
                 if [[ ${DEVICE_TYPE} == "udmp" ]]; then   #the UDMP is special because you have to run acme.sh inside the container
 
                     if ! [[ -z ${VERBOSE} ]]; then
-                        echo ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+                        echo ${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
                     fi
 
-                    ssh  -o LogLevel=Error ${k} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2> /tmp/updateLocalCerts.err
+                    ${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2> /tmp/updateLocalCerts.err
                     
                     SUCCESS=$?
                     
@@ -230,19 +250,20 @@ do
                         #if ! [[ -z ${VERBOSE} ]]; then
                             echo "Restarting unifi-os on "${k}
                         #fi
-                        ssh -o LogLevel=Error ${k} unifi-os restart
+                        ${SSH_DEF} ${k} unifi-os restart
                     elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
                         echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
-                        exit 1
+                    	echo "********************************* "$k" failed"
+                        # exit 1
                     fi
          
                 else
                 
                     if ! [[ -z ${VERBOSE} ]]; then
-                        echo ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+                        echo ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
                     fi
                 
-                    ssh  -o LogLevel=Error ${k} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+                    ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
                     
                     SUCCESS=$?
                         
@@ -254,6 +275,10 @@ do
 
                 fi
             fi
+            
+
+            
+            
         fi # end processing device
     fi # end not a comment
 done
