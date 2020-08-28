@@ -250,7 +250,7 @@ do
                         #if ! [[ -z ${VERBOSE} ]]; then
                             echo "Restarting unifi-os on "${k}
                         #fi
-                        ${SSH_DEF} ${k} unifi-os restart
+                        ${SSH_DEF} unifi-os restart
                     elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
                         echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
                     	echo "********************************* "$k" failed"
