@@ -324,33 +324,47 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
     if ! [[ -z ${VERBOSE} ]]; then
         echo "Installing .key, .crt, .pem in "${CERT_BASE}
     fi
+
+	SOURCE_KEY=${BASE}/${DOMAIN}/${DOMAIN}.key
+	SOURCE_CER=${BASE}/${DOMAIN}/${DOMAIN}.cer
+
+	if [[ ${DEVICE_TYPE} == "udmp" ]]; then
+		DEST_KEY=${CERT_BASE}/unifi-core.key
+	    DEST_CRT=${CERT_BASE}/unifi-core.crt
+	    DEST_PEM=${CERT_BASE}/${DOMAIN}.pem
+	else
+		DEST_KEY=${CERT_BASE}/${DOMAIN}.key
+	    DEST_CRT=${CERT_BASE}/${DOMAIN}.crt
+	    DEST_PEM=${CERT_BASE}/${DOMAIN}.pem
+	fi
     
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.key ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.key) ]]; then
-        ${SUDODEF} openssl rsa -in ${BASE}/${DOMAIN}/${DOMAIN}.key -out ${CERT_BASE}/${DOMAIN}.key || exit 1
+    
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_KEY} ] || [[ $(cmp  ${DEST_KEY} ${SOURCE_KEY}) ]]; then
+        ${SUDODEF} openssl rsa -in ${SOURCE_KEY} -out ${DEST_KEY} || exit 1
         echo ${CERT_BASE}/${DOMAIN}.key" updated"
         DIFF=1
     elif ! [[ -z ${VERBOSE} ]]; then
-        echo ${CERT_BASE}/${DOMAIN}.key" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.key
+        echo ${DEST_KEY}" unchanged, same as "${SOURCE_KEY}
     fi
 
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.crt ] || [[ $(cmp  ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CERT_BASE}/${DOMAIN}.crt) ]]; then
-        ${SUDODEF} openssl x509 -in ${BASE}/${DOMAIN}/${DOMAIN}.cer -out ${CERT_BASE}/${DOMAIN}.crt || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_CRT} ] || [[ $(cmp  ${SOURCE_CER} ${DEST_CRT}) ]]; then
+        ${SUDODEF} openssl x509 -in ${SOURCE_CER} -out ${DEST_CRT} || exit 1
         echo ${CERT_BASE}/${DOMAIN}.crt" updated"
         DIFF=1
     elif ! [[ -z ${VERBOSE} ]]; then
-        echo ${CERT_BASE}/${DOMAIN}.crt" unchanged, same as "${BASE}/${DOMAIN}/${DOMAIN}.cer
+        echo ${DEST_CRT}" unchanged, same as "${SOURCE_CER}
     fi
 
     # Note can't use regular > or >> because those redirections will not inherit the sudo part
-    ${SUDODEF} cat ${CERT_BASE}/${DOMAIN}.key ${CERT_BASE}/${DOMAIN}.crt | ${SUDODEF} tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
-    if ! [ -z "$FORCE" ] || ! [ -f ${CERT_BASE}/${DOMAIN}.pem ] || [[ $(cmp  ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem) ]]; then
+    ${SUDODEF} cat ${DEST_KEY} ${DEST_CRT} | ${SUDODEF} tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_PEM} ] || [[ $(cmp  ${CERT_BASE}/tmp.pem ${DEST_PEM}) ]]; then
         #sudo rm -f ${CERT_BASE}/${DOMAIN}.pem  || exit 1
-        ${SUDODEF} mv ${CERT_BASE}/tmp.pem ${CERT_BASE}/${DOMAIN}.pem || exit 1
-        echo ${CERT_BASE}/${DOMAIN}.pem" updated"
+        ${SUDODEF} mv ${CERT_BASE}/tmp.pem ${DEST_PEM} || exit 1
+        echo ${DEST_PEM}" updated"
         DIFF=1
     else
         if ! [[ -z ${VERBOSE} ]]; then
-            echo ${CERT_BASE}/${DOMAIN}.pem" unchanged, same as "${CERT_BASE}/tmp.pem
+            echo ${DEST_PEM}" unchanged"
         fi
         ${SUDODEF} rm -f ${CERT_BASE}/tmp.pem || exit 1
     fi
