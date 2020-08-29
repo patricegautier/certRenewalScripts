@@ -293,6 +293,10 @@ if  [[ ${DEVICE_TYPE} == "remote" ]]; then # we need to copy cert and key to rem
 	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.cer ${CONTAINER_DIRECTORY}
 	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.crt ${CONTAINER_DIRECTORY}
 
+    ${SUDODEF} cat ${BASE}/${DOMAIN}/${DOMAIN}.key ${BASE}/${DOMAIN}/${DOMAIN}.cer | ${SUDODEF} tee ${BASE}/${DOMAIN}/${DOMAIN}.pem >/dev/null || exit 1
+	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.pem ${CONTAINER_DIRECTORY}
+
+
 	echo ${k}" will need to be restarted by hand if necessary"
 
 fi
