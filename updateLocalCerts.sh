@@ -6,7 +6,7 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|remote [-1] [-f] [-k key] [-c containerName] [-d path] <fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|remote|service [-1] [-f] [-k key] [-c containerName] [-d path] [-e serviceName]<fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
@@ -16,6 +16,7 @@ usage()
     echo "  -o: the directory which contains the docker-compose.yml for type compose"
     echo "  -h: usage and list of default targets"
     echo "  -s: use Let's encrypt's staging environment"
+    echo "	-e: service name to restart"
     echo ""
     echo "Return 0 if credentials were updated and the container restarted, 1 if failure, 2 if nothing was changed"
 	exit 1
@@ -31,7 +32,7 @@ unset DEVICE_TYPE
 unset STAGING_OPTION
 unset VERBOSE
 
-while getopts 'v1ft:k:c:hd:o:s' o
+while getopts 'v1ft:k:c:hd:o:se:' o
 do
   case $o in
     1) 
@@ -47,6 +48,7 @@ do
     h) usage ;;
     v) VERBOSE="t" ;;
     s) STAGING_OPTION="--staging" ;;
+    e) SERVICE_NAME=${OPTARG} ;;
   esac
 done
 
@@ -280,7 +282,7 @@ if  [[ ${DEVICE_TYPE} == "syn" ]]; then
 fi
 
 
-if  [[ ${DEVICE_TYPE} == "remote" ]]; then # we need to copy cert and key to remote host
+if  [[ ${DEVICE_TYPE} == "local" ]]; then # we need to copy cert and key to remote host
 
 	# deal with restart needed - we force for now
 
@@ -296,13 +298,15 @@ if  [[ ${DEVICE_TYPE} == "remote" ]]; then # we need to copy cert and key to rem
     ${SUDODEF} cat ${BASE}/${DOMAIN}/${DOMAIN}.key ${BASE}/${DOMAIN}/${DOMAIN}.cer | ${SUDODEF} tee ${BASE}/${DOMAIN}/${DOMAIN}.pem >/dev/null || exit 1
 	scp -o LogLevel=Error ${BASE}/${DOMAIN}/${DOMAIN}.pem ${CONTAINER_DIRECTORY}
 
+	DEVICE_NAME=`echo "$CONTAINER_DIRECTORY" | awk -F':' '{print $1}'`
+	DEVICE_NAME=`echo "$DEVICE_NAME" | awk -F'@' '{print $2}'`
 
-	echo ${k}" will need to be restarted by hand if necessary"
+	echo ${DEVICE_NAME}" will need to be restarted by hand if necessary"
 
 fi
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]  ||  [[ ${DEVICE_TYPE} == "service" ]]; then
     
     unset DIFF
     
@@ -398,15 +402,24 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
             
         elif [[ ${DEVICE_TYPE} == "pihole" ]]; then
         
+            echo "Restarting lighthttpd"
             sudo service lighttpd restart || exit 1
 
         elif [[ ${DEVICE_TYPE} == "apache2" ]]; then
         
+            echo "Restarting Apache2 " ${SERVICE_NAME}
             sudo service apache2 restart || exit 1
 
         elif  [[ ${DEVICE_TYPE} == "nvr4" ]]; then
         
+            echo "Restarting unifi-core"
             sudo service unifi-core restart || exit 1 # not sure if that is enough
+
+        
+        elif  [[ ${DEVICE_TYPE} == "service" ]]; then
+        
+            echo "Restarting service " ${SERVICE_NAME}
+            sudo service ${SERVICE_NAME} restart || exit 1 # not sure if that is enough
 
         fi
         
