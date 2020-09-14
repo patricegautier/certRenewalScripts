@@ -54,7 +54,7 @@ if [ ${PUBKEY_OK} != '0'  ]; then
 	if [[ -z ${SSH_PASS_FILE} ]]; then
 	   	ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
 	else
-	   	sshpass -f ${SSH_PASS_FILE} ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
+	   	sshpass -f ${SSH_PASS_FILE} ssh -o "BatchMode yes" -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
 	fi
 fi
 
