@@ -3,7 +3,8 @@
 
 usage()
 {
-	echo "Usage "${0}" [-i privateKeyPath] user@targetMachine"
+	echo "Usage "${0}" [-i privateKeyPath] [-s <fileName>] user@targetMachine"
+	echo "-s use sshpass with given password file"
     echo "  returns "
 	exit 2
 }
@@ -12,10 +13,11 @@ usage()
 
 
 
-while getopts 'i:' OPT
+while getopts 'i:s:' OPT
 do
   case $OPT in
     i) PRIVKEY_PATH=${OPTARG} ;;
+    s) SSH_PASS_FILE=${OPTARG} ;;
   esac
 done
 
@@ -49,8 +51,11 @@ PUBKEY_OK=$?
 
 if [ ${PUBKEY_OK} != '0'  ]; then
 	echo "Need to update public key for " ${TARGET}
-
-   	ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
+	if [[ -z ${SSH_PASS_FILE} ]]; then
+	   	ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
+	else
+	   	sshpass -f ${SSH_PASS_FILE} ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
+	fi
 fi
 
 #ssh-copy-id ${TARGET}  > /dev/null
