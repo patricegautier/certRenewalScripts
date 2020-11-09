@@ -237,7 +237,7 @@ do
 		 
 			
 			# Making sure the public key is correctly setuo - you might have to type your password the first time
-			${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
+			${SCRIPT_DIR}/updatePublicKey.sh  -s ~/.ssh/gwPw.txt ${k} || exit 1;
 
 			# Making sure the acme directory exists
 			
