@@ -394,7 +394,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
                 usage;
             fi
             echo "Restarting container "${CONTAINER_NAME}
-            /usr/local/bin/docker restart ${CONTAINER_NAME} || exit 1
+            sudo /usr/local/bin/docker restart ${CONTAINER_NAME} || exit 1
             
         elif [[ ${DEVICE_TYPE} == "compose" ]]; then
         

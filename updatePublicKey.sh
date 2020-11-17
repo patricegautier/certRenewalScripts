@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -x
+# set -x
 
 usage()
 {
@@ -51,11 +51,11 @@ PUBKEY_OK=$?
 SSHPASS=`which sshpass`
 
 if [ ${PUBKEY_OK} != '0'  ]; then
-	echo "Need to update public key for " ${TARGET}
-	if [[ -z ${SSH_PASS_FILE} ]] || [[ -z ${SSHPASS} ]]; then
-	   	ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
+	echo Need to update public key for ${TARGET}
+	if [[ -z ${SSH_PASS_FILE} ]] || ! [[ -e ${SSH_PASS_FILE} ]] || [[ -z ${SSHPASS} ]]; then
+	   	ssh ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
 	else
-	   	sshpass -f ${SSH_PASS_FILE} ssh -i ${PRIVKEY_PATH}  ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
+	   	sshpass -f ${SSH_PASS_FILE} ssh ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
 	fi
 fi
 
