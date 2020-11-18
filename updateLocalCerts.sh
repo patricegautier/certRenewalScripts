@@ -353,7 +353,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
 	fi
     
     
-    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_KEY} ] || [[ $(cmp  ${DEST_KEY} ${SOURCE_KEY}) ]]; then
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_KEY} ] || [[ $(${SUDODEF} cmp  ${DEST_KEY} ${SOURCE_KEY}) ]]; then
         ${SUDODEF} openssl rsa -in ${SOURCE_KEY} -out ${DEST_KEY} || exit 1
         echo ${CERT_BASE}/${DOMAIN}.key" updated"
         DIFF=1
@@ -361,7 +361,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
         echo ${DEST_KEY}" unchanged, same as "${SOURCE_KEY}
     fi
 
-    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_CRT} ] || [[ $(cmp  ${SOURCE_CER} ${DEST_CRT}) ]]; then
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_CRT} ] || [[ $(${SUDODEF} cmp  ${SOURCE_CER} ${DEST_CRT}) ]]; then
         ${SUDODEF} openssl x509 -in ${SOURCE_CER} -out ${DEST_CRT} || exit 1
         echo ${CERT_BASE}/${DOMAIN}.crt" updated"
         DIFF=1
@@ -371,7 +371,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
 
     # Note can't use regular > or >> because those redirections will not inherit the sudo part
     ${SUDODEF} cat ${DEST_KEY} ${DEST_CRT} | ${SUDODEF} tee ${CERT_BASE}/tmp.pem >/dev/null || exit 1
-    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_PEM} ] || [[ $(cmp  ${CERT_BASE}/tmp.pem ${DEST_PEM}) ]]; then
+    if ! [ -z "$FORCE" ] || ! [ -f ${DEST_PEM} ] || [[ $(${SUDODEF} cmp  ${CERT_BASE}/tmp.pem ${DEST_PEM}) ]]; then
         #sudo rm -f ${CERT_BASE}/${DOMAIN}.pem  || exit 1
         ${SUDODEF} mv ${CERT_BASE}/tmp.pem ${DEST_PEM} || exit 1
         echo ${DEST_PEM}" updated"
