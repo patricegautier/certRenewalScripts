@@ -6,7 +6,7 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|remote|service [-1] [-f] [-k key] [-c containerName] [-d path] [-e serviceName]<fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|unifios|remote|service [-1] [-f] [-k key] [-c containerName] [-d path] [-e serviceName]<fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
@@ -312,12 +312,12 @@ if  [[ ${DEVICE_TYPE} == "local" ]]; then # we need to copy cert and key to remo
 fi
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]  ||  [[ ${DEVICE_TYPE} == "service" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]  ||  [[ ${DEVICE_TYPE} == "unifios" ]]  ||  [[ ${DEVICE_TYPE} == "service" ]]; then
     
     unset DIFF
     
     
-    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]] ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then   # piholes refer directly to the .acme.sh directory
+    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]] ||  [[ ${DEVICE_TYPE} == "nvr4" ]] ||  [[ ${DEVICE_TYPE} == "unifios" ]]; then   # piholes refer directly to the .acme.sh directory
         CERT_BASE=${BASE}/${DOMAIN}
     else
         CERT_BASE=${CONTAINER_DIRECTORY}

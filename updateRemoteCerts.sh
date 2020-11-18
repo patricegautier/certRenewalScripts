@@ -22,6 +22,7 @@ usage()
     echo "       <name>:ck:<username@FQDN> for Cloud Keys"
     echo "       <name>:syn:<username@FQDN> for Synology boxes"
     echo "       <name>:nvr4:<username@FQDN> for Unifi NVR4 protect servers"
+    echo "       <name>:unifios:<username@FQDN> for Cloud Keys running Unifi OS"
     echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
     echo "          The target dir must be in a docker volume"
     echo "       <name>:service:<username@FQDN>:<targetDirectory>:<serviceName> run the cert script remotely and just copy the certs in the target directory"
