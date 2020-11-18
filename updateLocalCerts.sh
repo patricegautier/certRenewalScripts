@@ -416,8 +416,7 @@ if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] ||
             echo "Restarting Apache2 " ${SERVICE_NAME}
             sudo service apache2 restart || exit 1
 
-        elif  [[ ${DEVICE_TYPE} == "nvr4" ]]; then
-        
+        elif  [[ ${DEVICE_TYPE} == "nvr4" ]] ||  [[ ${DEVICE_TYPE} == "unifios" ]]; then
             echo "Restarting unifi-core"
             sudo service unifi-core restart || exit 1 # not sure if that is enough
 
