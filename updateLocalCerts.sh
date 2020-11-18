@@ -6,7 +6,7 @@ usage()
     echo "---------- Invoked: "
     echo ${COMMAND} ${FULLCOMMAND}
     echo "----------"
-	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|remote|service [-1] [-f] [-k key] [-c containerName] [-d path] [-e serviceName]<fqdn>"
+	echo "Usage "${0}" -t ck|udmp|pihole|container|compose|unms|pihole|apache2|nvr4|unifios|remote|service [-1] [-f] [-k key] [-c containerName] [-d path] [-e serviceName]<fqdn>"
 	echo "  -t:	device type, cloud key, UDMP, pihole or container"
 	echo "  -1:  first run, will install acme.sh. -k key must be present to provide the Gandi Live DNS key"
 	echo "  -f: force renewal of the cert"
@@ -16,6 +16,7 @@ usage()
     echo "  -o: the directory which contains the docker-compose.yml for type compose"
     echo "  -h: usage and list of default targets"
     echo "  -s: use Let's encrypt's staging environment"
+    echo "  -b: specify the base directory for acme.sh - defaults to $HOME/.acme.sh"
     echo "	-e: service name to restart"
     echo ""
     echo "Return 0 if credentials were updated and the container restarted, 1 if failure, 2 if nothing was changed"
@@ -31,8 +32,9 @@ FIRST_RUN=false
 unset DEVICE_TYPE
 unset STAGING_OPTION
 unset VERBOSE
+unset BASE
 
-while getopts 'v1ft:k:c:hd:o:se:' o
+while getopts 'v1ft:k:c:hd:o:sb:e:' o
 do
   case $o in
     1) 
@@ -48,6 +50,7 @@ do
     h) usage ;;
     v) VERBOSE="t" ;;
     s) STAGING_OPTION="--staging" ;;
+    b) BASE=${OPTARG} ;;
     e) SERVICE_NAME=${OPTARG} ;;
   esac
 done
@@ -75,8 +78,11 @@ if [ -z ${DEVICE_TYPE} ]; then
 	usage;
 fi
 
-
-BASE=${HOME}/.acme.sh
+if [ -z ${BASE} ]; then
+    BASE=${HOME}/.acme.sh
+elif ! [[ -z ${VERBOSE} ]]; then
+    echo "Custom base for acme.sh: "${BASE}
+fi
 
 
 # First time installation
@@ -306,12 +312,12 @@ if  [[ ${DEVICE_TYPE} == "local" ]]; then # we need to copy cert and key to remo
 fi
 
 
-if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]  ||  [[ ${DEVICE_TYPE} == "service" ]]; then
+if  [[ ${DEVICE_TYPE} == "container" ]]  || [[ ${DEVICE_TYPE} == "compose" ]] || [[ ${DEVICE_TYPE} == "pihole" ]] || [[ ${DEVICE_TYPE} == "udmp" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]]  ||  [[ ${DEVICE_TYPE} == "nvr4" ]]  ||  [[ ${DEVICE_TYPE} == "unifios" ]]  ||  [[ ${DEVICE_TYPE} == "service" ]]; then
     
     unset DIFF
     
     
-    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]] ||  [[ ${DEVICE_TYPE} == "nvr4" ]]; then   # piholes refer directly to the .acme.sh directory
+    if [[ ${DEVICE_TYPE} == "pihole" ]] ||  [[ ${DEVICE_TYPE} == "apache2" ]] ||  [[ ${DEVICE_TYPE} == "nvr4" ]] ||  [[ ${DEVICE_TYPE} == "unifios" ]]; then   # piholes refer directly to the .acme.sh directory
         CERT_BASE=${BASE}/${DOMAIN}
     else
         CERT_BASE=${CONTAINER_DIRECTORY}
