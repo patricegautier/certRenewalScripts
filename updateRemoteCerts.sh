@@ -13,6 +13,7 @@ usage()
     echo "  -v: verbose output"
     echo "  -s: using let's encrypt staging to avoid running into quotas"
     echo "  -l: list the available device names from the list of targets"
+    echo "  -b: batch mode - keep going even if errors are encountered"
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
     echo "    Possible formats are:"
@@ -51,8 +52,9 @@ unset VERBOSE
 unset STAGING_OPTION
 unset TARGET_DEVICE_NAMES
 unset LIST_MODE
+unset BACTH_MODE
 
-while getopts '1fk:hvsl' OPT
+while getopts 'b1fk:hvsl' OPT
 do
   case $OPT in
     1) FIRST_RUN="-1" ;;
@@ -62,6 +64,7 @@ do
     v) VERBOSE="-v" ;;
     s) STAGING_OPTION="-s" ;;
     l) LIST_MODE="t" ;;
+    b) BATCH_MODE="-b" ;;
   esac
 done
 
@@ -239,11 +242,17 @@ do
 		 
 			
 			# Making sure the public key is correctly setuo - you might have to type your password the first time
-			${SCRIPT_DIR}/updatePublicKey.sh ${k} || exit 1;
+			${SCRIPT_DIR}/updatePublicKey.sh ${k};
+			if ! [[ $? -eq 0 ]] && [[ -z ${BATCH_MODE} ]]; then
+				exit 1;
+			fi
 
 			# Making sure the acme directory exists
 			
-			${SSH_DEF} mkdir -p ${REMOTE_SCRIPT_DIR} || exit 1;
+			${SSH_DEF} mkdir -p ${REMOTE_SCRIPT_DIR};
+			if ! [[ $? -eq 0 ]] && [[ -z ${BATCH_MODE} ]]; then
+				exit 1;
+			fi
 				
 			if ! [[ -z ${VERBOSE} ]]; then
 				echo ${SCP_DEF}  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
@@ -283,7 +292,10 @@ do
 					
 				if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
 					echo "********************************* "$k" failed"
-					#exit 1 -- keep going
+					if  [[ -z ${BATCH_MODE} ]]; then
+						exit 1;
+					fi
+
 				fi
 
 
