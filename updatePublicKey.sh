@@ -3,21 +3,23 @@
 
 usage()
 {
-	echo "Usage "${0}" [-i privateKeyPath] [-s <fileName>] user@targetMachine"
+	echo "Usage "${0}" [-d] [-i privateKeyPath] [-s <fileName>] user@targetMachine"
+	echo "-i specify private public key pair"
 	echo "-s use sshpass with given password file. Will ask for the password if sshpass is not installed"
-    echo "  returns "
+	echo "-d disabled strick host key checking with SSH option StrictHostKeyChecking=no"	
 	exit 2
 }
 
 
 
+STRICT=""
 
-
-while getopts 'i:s:' OPT
+while getopts 'i:s:d' OPT
 do
   case $OPT in
     i) PRIVKEY_PATH=${OPTARG} ;;
     s) SSH_PASS_FILE=${OPTARG} ;;
+    d) STRICT="-o StrictHostKeyChecking=no" ;;
   esac
 done
 
@@ -53,9 +55,9 @@ SSHPASS=`which sshpass`
 if [ ${PUBKEY_OK} != '0'  ]; then
 	echo Need to update public key for ${TARGET}
 	if [[ -z ${SSH_PASS_FILE} ]] || ! [[ -e ${SSH_PASS_FILE} ]] || [[ -z ${SSHPASS} ]]; then
-	   	ssh ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
+	   	ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
 	else
-	   	sshpass -f ${SSH_PASS_FILE} ssh ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
+	   	sshpass -f ${SSH_PASS_FILE} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
 	fi
 fi
 
