@@ -150,7 +150,7 @@ do
 
 
 
-		if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} =~ ${DEVICE_NAME} ]]; then
+		if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} == ${DEVICE_NAME} ]]; then
 
 			echo "-------------- Processing "${DEVICE_NAME}
 
