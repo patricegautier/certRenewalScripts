@@ -251,7 +251,7 @@ do
 					exit 1;
 				fi
 
-			else
+			elif ! [[ ${DEVICE_TYPE} == "gt" ]]; then   # gt is just a convenience to ssh - no cert renewal
 
 				# Making sure the acme directory exists
 			
