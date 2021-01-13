@@ -1,0 +1,121 @@
+#!/bin/bash
+#set -x
+
+usage()
+{
+	echo "Usage "${0}" [-h] [-v] target"
+    echo ""
+	exit 1
+}
+
+
+SCRIPT_DIR=$(dirname "$0")
+
+
+unset FORCE
+unset FIRST_RUN
+unset DEVICES
+unset GANDI_KEY
+unset CONTAINER_OPTION
+unset HELP
+unset VERBOSE
+unset STAGING_OPTION
+unset LIST_MODE
+unset BACTH_MODE
+
+while getopts 'hv' OPT
+do
+  case $OPT in
+    h) usage ;;
+    v) VERBOSE=true ;;
+  esac
+done
+
+shift $((OPTIND-1))
+TARGET=$@
+
+# read config file
+HOSTS_PATH=${HOME}"/.ssh/remoteCertHosts.txt"
+if [ -f ${HOSTS_PATH} ]; then
+    DEVICES_FROM_FILE=`cat ${HOSTS_PATH} | grep ^[^#]`
+fi
+
+
+if [ -z "$TARGET" ]; then
+	echo "No Target specified"
+	usage
+fi
+
+
+    
+if [ -z "$DEVICES_FROM_FILE" ]; then
+    echo "** Could not read default list from "${HOSTS_PATH}
+    usage
+fi
+
+
+unset DEVICE_FOUND
+
+for DEVICE_DEFINITION in ${DEVICES_FROM_FILE}
+do
+
+    if ! [[ -z "$DEVICE_DEFINITION" ]] && ! [[ "$DEVICE_DEFINITION" =~ ^\#.* ]]; then   # not a blank line and not a comment
+
+        if ! [[ "$DEVICE_DEFINITION" =~ ":" ]]; then   # Missing name
+            echo "Missing name in "${DEVICE_DEFINITION}
+            usage
+        else
+            DEVICE_NAME=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $1}'`
+        fi
+
+		if [[ ${TARGET} == ${DEVICE_NAME} ]]; then
+
+#			echo "-------------- Processing "${DEVICE_NAME}
+			DEVICE_FOUND=true
+
+			if [[ "$DEVICE_DEFINITION" =~ ":" ]]; then   # type was  specified
+				DEVICE_TYPE=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $2}'`
+				k=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $3}'`
+
+			else
+				echo "Missing type in "$DEVICE_DEFINITION
+				usage
+			fi
+
+
+			if ! [[ "$k" =~ "@" ]]; then
+				echo "** Missing user name in" ${k}
+				usage
+			fi
+		 
+			if ! [[ "$k" =~ "." ]]; then
+				echo "Domain must be fully qualified: "${k}
+				usage;
+			fi
+
+			if ! [[ -z ${VERBOSE} ]]; then
+				echo "Device type: "${DEVICE_TYPE}
+			fi
+
+			if ! [[ -z ${VERBOSE} ]]; then
+				echo "user@domain: "$k
+			fi
+
+		 
+			
+			# Making sure the public key is correctly setup - you might have to type your password the first time
+			${SCRIPT_DIR}/updatePublicKey.sh ${k};
+			ssh ${k}
+
+		
+
+                        
+        fi # end processing device
+    fi # end not a comment
+done
+
+if [ -z ${DEVICE_FOUND} ]; then
+	echo "Could not find target "${TARGET}" in "${HOSTS_PATH}
+fi
+
+
