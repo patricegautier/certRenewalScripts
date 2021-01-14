@@ -57,13 +57,14 @@ SSHPASS=`which sshpass`
 
 if [ ${PUBKEY_OK} != '0'  ]; then
 	echo Need to update public key for ${TARGET}
+	unset DROPBEAR_CMD
+   	if ! [[ -z ${DROPBEAR} ]]; then
+	   	DROPBEAR_CMD=" && cp .ssh/authorized_keys /var/etc/dropbear/"
+   	fi
 	if [[ -z ${SSH_PASS_FILE} ]] || ! [[ -e ${SSH_PASS_FILE} ]] || [[ -z ${SSHPASS} ]]; then
-	   	ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;
-	   	if ! [[ -z ${DROPBEAR} ]]; then
-		   	ssh ${TARGET} "cp .ssh/authorized_keys /var/etc/dropbear/" || exit 1;	   	
-	   	fi
+	   	ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;
 	else
-	   	sshpass -f ${SSH_PASS_FILE} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys" || exit 1;		
+	   	sshpass -f ${SSH_PASS_FILE} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;		
 	fi
 fi
 
