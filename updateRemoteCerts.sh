@@ -3,7 +3,7 @@
 
 usage()
 {
-	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] [ <target>* | <name>* ]"
+	echo "Usage "${0}" [-1] [-f] [-k gandiLiveDNSKey] [-h] [-s] [-i] [ <target>* | <name>* ]"
     echo ""
 	echo "  -1: first run, will install acme.sh on the remote machine"
 	echo "  -f: force renewal of the cert"
@@ -13,7 +13,7 @@ usage()
     echo "  -v: verbose output"
     echo "  -s: using let's encrypt staging to avoid running into quotas"
     echo "  -l: list the available device names from the list of targets"
-    echo "  -b: batch mode - keep going even if errors are encountered"
+    echo "  -i: interactive mode - stop when errors are encountered"
     echo ""
 	echo "  targets: defaults to the contents of ~/.ssh/remoteCertHosts.txt"
     echo "    Possible formats are:"
@@ -25,7 +25,7 @@ usage()
     echo "       <name>:nvr4:<username@FQDN> for Unifi NVR4 protect servers"
     echo "       <name>:unifios:<username@FQDN> for Cloud Keys running Unifi OS"
     echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
-    echo "          The target dir must be in a docker volume"
+    echo "          The target dir must be in a docker volume. The container will be restarted"
     echo "       <name>:service:<username@FQDN>:<targetDirectory>:<serviceName> run the cert script remotely and just copy the certs in the target directory"
     echo "			you need to setup a link by hand the first time to the certs.  the service will be restarted if certs are updated"
     echo "       <name>:local:<username@FQDN>:<targetDirectory> run the cert script locally and just copy the certs in the target directory"
@@ -52,9 +52,9 @@ unset VERBOSE
 unset STAGING_OPTION
 unset TARGET_DEVICE_NAMES
 unset LIST_MODE
-unset BACTH_MODE
+unset INTERACTIVE_MODE
 
-while getopts 'b1fk:hvsl' OPT
+while getopts 'i1fk:hvsl' OPT
 do
   case $OPT in
     1) FIRST_RUN="-1" ;;
@@ -64,7 +64,7 @@ do
     v) VERBOSE="-v" ;;
     s) STAGING_OPTION="-s" ;;
     l) LIST_MODE="t" ;;
-    b) BATCH_MODE="-b" ;;
+    b) INTERACTIVE_MODE="-i" ;;
   esac
 done
 
@@ -150,7 +150,7 @@ do
 
 
 
-		if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} =~ ${DEVICE_NAME} ]]; then
+		if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} == ${DEVICE_NAME} ]]; then
 
 			echo "-------------- Processing "${DEVICE_NAME}
 
@@ -241,67 +241,70 @@ do
 			fi
 		 
 			
-			# Making sure the public key is correctly setuo - you might have to type your password the first time
+			# Making sure the public key is correctly setup - you might have to type your password the first time
 			${SCRIPT_DIR}/updatePublicKey.sh ${k};
-			if ! [[ $? -eq 0 ]] && [[ -z ${BATCH_MODE} ]]; then
-				exit 1;
-			fi
+			if ! [[ $? -eq 0 ]]; then
 
-			# Making sure the acme directory exists
+				echo "******************  Skipping "${k}": Could not SSH into it"
 			
-			${SSH_DEF} mkdir -p ${REMOTE_SCRIPT_DIR};
-			if ! [[ $? -eq 0 ]] && [[ -z ${BATCH_MODE} ]]; then
-				exit 1;
-			fi
+				if ! [[ -z ${INTERACTIVE_MODE} ]]; then
+					exit 1;
+				fi
+
+			elif ! [[ ${DEVICE_TYPE} == "gt" ]]; then   # gt is just a convenience to ssh - no cert renewal
+
+				# Making sure the acme directory exists
+			
+				${SSH_DEF} mkdir -p ${REMOTE_SCRIPT_DIR};
 				
-			if ! [[ -z ${VERBOSE} ]]; then
-				echo ${SCP_DEF}  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
-			fi
-			${SCP_DEF} "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
-
-			if [[ ${DEVICE_TYPE} == "udmp" ]]; then   #the UDMP is special because you have to run acme.sh inside the container
-
 				if ! [[ -z ${VERBOSE} ]]; then
-					echo ${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
+					echo ${SCP_DEF}  "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}
 				fi
+				${SCP_DEF} "${SCRIPT_DIR}/${REMOTE_SCRIPT_NAME}" ${SCP_K_DEF}${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} > /dev/null || exit 1;
 
-				${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2> /tmp/updateLocalCerts.err
-				
-				SUCCESS=$?
-				
-				if [[ ${SUCCESS} -eq 0 ]]; then
-					#if ! [[ -z ${VERBOSE} ]]; then
-						echo "Restarting unifi-os on "${k}
-					#fi
-					${SSH_DEF} unifi-os restart
-				elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
-					echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
-					echo "********************************* "$k" failed"
-					# exit 1
-				fi
-	 
-			else
-			
-				if ! [[ -z ${VERBOSE} ]]; then
-					echo ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
-				fi
-			
-				${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
-				
-				SUCCESS=$?
-					
-				if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
-					echo "********************************* "$k" failed"
-					if  [[ -z ${BATCH_MODE} ]]; then
-						exit 1;
+				if [[ ${DEVICE_TYPE} == "udmp" ]]; then   #the UDMP is special because you have to run acme.sh inside the container
+
+					if ! [[ -z ${VERBOSE} ]]; then
+						echo ${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k}
 					fi
 
+					${SSH_DEF} docker exec unifi-os /data/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${k} 2> /tmp/updateLocalCerts.err
+				
+					SUCCESS=$?
+				
+					if [[ ${SUCCESS} -eq 0 ]]; then
+						#if ! [[ -z ${VERBOSE} ]]; then
+							echo "Restarting unifi-os on "${k}
+						#fi
+						${SSH_DEF} unifi-os restart
+					elif [[ ${SUCCESS} -ne 2 ]]; then # 2 only means nothing was changed
+						echo "An error was encountered on the UDMP - it is logged at /tmp/updateLocalCerts.err"
+						echo "********************************* "$k" failed"
+						# exit 1
+					fi
+	 
+				else
+			
+					if ! [[ -z ${VERBOSE} ]]; then
+						echo ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
+					fi
+			
+					${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
+				
+					SUCCESS=$?
+					
+					if [[ ${SUCCESS} -ne 2 ]] && [[ ${SUCCESS} -ne 0 ]]; then # 2 only means nothing was changed
+						echo "********************************* "$k" failed"
+						if  ! [[ -z ${INTERACTIVE_MODE} ]]; then
+							exit 1;
+						fi
+
+					fi
+
+
 				fi
-
-
-			fi
 		
-
+			fi #
                         
         fi # end processing device
     fi # end not a comment
