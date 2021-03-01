@@ -24,8 +24,9 @@ usage()
     echo "       <name>:syn:<username@FQDN> for Synology boxes"
     echo "       <name>:nvr4:<username@FQDN> for Unifi NVR4 protect servers"
     echo "       <name>:unifios:<username@FQDN> for Cloud Keys running Unifi OS"
-    echo "       <name>:container:<containName>:<targetDirectory>:<username@FQDN> for generic container targets"
+    echo "       <name>:container:<username@FQDN>:<containerName>:<targetDirectory> for generic container targets"
     echo "          The target dir must be in a docker volume. The container will be restarted"
+    echo "       <name>:container:<username@FQDN>:<containerName>:<targetDirectory>:<FQDN> for generic containers running on their own IPs via macvlan - FQDN must resolve to that IP"    
     echo "       <name>:service:<username@FQDN>:<targetDirectory>:<serviceName> run the cert script remotely and just copy the certs in the target directory"
     echo "			you need to setup a link by hand the first time to the certs.  the service will be restarted if certs are updated"
     echo "       <name>:local:<username@FQDN>:<targetDirectory> run the cert script locally and just copy the certs in the target directory"
@@ -138,6 +139,7 @@ do
     unset DEVICE_TYPE
     unset DEVICE_NAME
     unset REMOTE_OPTION
+    unset CONTAINER_FQDN
 
     if ! [[ -z "$DEVICE_DEFINITION" ]] && ! [[ "$DEVICE_DEFINITION" =~ ^\#.* ]]; then   # not a blank line and not a comment
 
@@ -152,7 +154,7 @@ do
 
 		if [[ -z ${TARGET_DEVICE_NAMES} ]] || [[ ${TARGET_DEVICE_NAMES} == ${DEVICE_NAME} ]]; then
 
-			echo "-------------- Processing "${DEVICE_NAME}
+			echo "-------------- Checking certs on "${DEVICE_NAME}
 
 			if [[ "$DEVICE_DEFINITION" =~ ":" ]]; then   # type was  specified
 				DEVICE_TYPE=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $2}'`
@@ -163,10 +165,14 @@ do
 
 					CONTAINER_NAME=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $4}'`
 					TARGET_DIR=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $5}'`
+					CONTAINER_FQDN=`echo "$DEVICE_DEFINITION" | awk -F':' '{print $6}'`
 					CONTAINER_OPTION="-c "${CONTAINER_NAME}" -d "${TARGET_DIR}
 					if ! [[ -z ${VERBOSE} ]]; then
 						echo "Container name: "${CONTAINER_NAME}
 						echo "Target directory: "${TARGET_DIR}
+						if ! [[ -z "${CONTAINER_FQDN}" ]]; then
+							echo "Container macvlan FQDN: "${CONTAINER_FQDN}
+						fi
 					fi
 
 				elif [[ ${DEVICE_TYPE} == "compose" ]]; then
@@ -284,12 +290,18 @@ do
 					fi
 	 
 				else
-			
-					if ! [[ -z ${VERBOSE} ]]; then
-						echo ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
+				
+					TARGET_USERAT_DOMAIN=${k}
+					if ! [[ -z "${CONTAINER_FQDN}" ]]; then
+						USER=$(echo ${k} | cut -d"@" -f1)
+						TARGET_USERAT_DOMAIN=${USER}"@"${CONTAINER_FQDN}
 					fi
 			
-					${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${k}
+					if ! [[ -z ${VERBOSE} ]]; then
+						echo ${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${TARGET_USERAT_DOMAIN}
+					fi
+			
+					${SSH_DEF} ${REMOTE_SCRIPT_DIR}/${REMOTE_SCRIPT_NAME} ${VERBOSE} -t ${DEVICE_TYPE} ${FIRST_RUN} ${FORCE} ${CONTAINER_OPTION} ${GANDI_KEY_OPTION} ${COMPOSE_OPTION} ${STAGING_OPTION} ${REMOTE_OPTION} ${TARGET_USERAT_DOMAIN}
 				
 					SUCCESS=$?
 					
