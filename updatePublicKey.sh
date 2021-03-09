@@ -26,6 +26,7 @@ do
     d) STRICT="-o StrictHostKeyChecking=no" ;;
     b) DROPBEAR=true ;;
     u) SUDO_USER="sudo -u "${OPTARG} ;;
+	?) usage ;;
   esac
 done
 
