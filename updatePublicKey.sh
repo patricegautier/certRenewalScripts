@@ -9,6 +9,7 @@ usage()
 	echo "-d disabled strict host key checking with SSH option StrictHostKeyChecking=no"
 	echo "-b for dropbear (used in protect cameras) additionally copy ~/.ssh/authorized_keys to /var/etc/dropbear"
 	echo "-u run the command as <user>"
+	echo "-4 force ipv4"
 	exit 2
 }
 
@@ -17,8 +18,9 @@ usage()
 STRICT=""
 unset DROPBEAR
 unset SUDO_USER
+unset IPV4
 
-while getopts 'i:s:dbu:' OPT
+while getopts 'i:s:dbu:4' OPT
 do
   case $OPT in
     i) PRIVKEY_PATH=${OPTARG} ;;
@@ -26,6 +28,7 @@ do
     d) STRICT="-o StrictHostKeyChecking=no" ;;
     b) DROPBEAR=true ;;
     u) SUDO_USER="sudo -u "${OPTARG} ;;
+    4) IPV4="-4" ;;
   esac
 done
 
@@ -54,7 +57,7 @@ fi
 
 
 
-${SUDO_USER} ssh -i ${PRIVKEY_PATH} -q -o "BatchMode yes" ${TARGET} true
+${SUDO_USER} ssh ${IPV4} -i ${PRIVKEY_PATH} -q -o "BatchMode yes" ${TARGET} true
 PUBKEY_OK=$?
 SSHPASS=`which sshpass`
 
@@ -65,13 +68,11 @@ if [ ${PUBKEY_OK} != '0'  ]; then
 	   	DROPBEAR_CMD=" && cp .ssh/authorized_keys /var/etc/dropbear/"
    	fi
 	if [[ -z ${SSH_PASS_FILE} ]] || ! [[ -e ${SSH_PASS_FILE} ]] || [[ -z ${SSHPASS} ]]; then
-	   	${SUDO_USER} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;
+	   	${SUDO_USER} ssh ${IPV4} ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;
 	else
-	   	${SUDO_USER} sshpass -f ${SSH_PASS_FILE} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;		
+	   	${SUDO_USER} sshpass ${IPV4} -f ${SSH_PASS_FILE} ssh ${STRICT} ${TARGET} "mkdir -p .ssh && echo '${PUBKEY}' >> .ssh/authorized_keys ${DROPBEAR_CMD}" || exit 1;		
 	fi
 fi
 
 #ssh-copy-id ${TARGET}  > /dev/null
-
-
 
