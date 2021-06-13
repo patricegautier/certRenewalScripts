@@ -52,6 +52,7 @@ do
     s) STAGING_OPTION="--staging" ;;
     b) BASE=${OPTARG} ;;
     e) SERVICE_NAME=${OPTARG} ;;
+	?) usage ;;
   esac
 done
 

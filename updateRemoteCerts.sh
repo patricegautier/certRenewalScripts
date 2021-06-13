@@ -66,6 +66,7 @@ do
     s) STAGING_OPTION="-s" ;;
     l) LIST_MODE="t" ;;
     b) INTERACTIVE_MODE="-i" ;;
+	?) usage ;;
   esac
 done
 

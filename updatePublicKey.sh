@@ -29,6 +29,7 @@ do
     b) DROPBEAR=true ;;
     u) SUDO_USER="sudo -u "${OPTARG} ;;
     4) IPV4="-4" ;;
+	?) usage ;;
   esac
 done
 
